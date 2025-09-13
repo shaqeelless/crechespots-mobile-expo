@@ -7,19 +7,72 @@ import {
   Pressable,
   Image,
 } from 'react-native';
-import { User, CreditCard as Edit3, Calendar, Star, CreditCard, Settings, Bell, Shield, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { User, CreditCard as Edit3, Calendar, Star, CreditCard, Settings, Bell, Shield, CircleHelp as HelpCircle, Baby, FileText, MapPin, Phone, Mail } from 'lucide-react-native';
+
+// Mock user data - in a real app, this would come from Supabase
+const userData = {
+  id: '1',
+  firstName: 'John',
+  lastName: 'Smith',
+  email: 'john.smith@email.com',
+  phoneNumber: '+27 82 123 4567',
+  profilePictureUrl: null,
+  address: '123 Main Street, Cape Town, Western Cape',
+  memberSince: '2024-01-01',
+  children: [
+    {
+      id: '1',
+      firstName: 'Emma',
+      lastName: 'Smith',
+      dateOfBirth: '2020-03-15',
+      gender: 'Female',
+      profilePictureUrl: null,
+    },
+    {
+      id: '2',
+      firstName: 'Liam',
+      lastName: 'Smith',
+      dateOfBirth: '2018-07-22',
+      gender: 'Male',
+      profilePictureUrl: null,
+    }
+  ],
+  stats: {
+    applications: 5,
+    acceptedApplications: 2,
+    activeEnrollments: 1,
+  }
+};
 
 export default function ProfileScreen() {
   const profileMenuItems = [
-    { icon: Edit3, label: 'Edit Profile', color: '#f68484' },
-    { icon: Calendar, label: 'Booking History', color: '#9cdcb8' },
-    { icon: Star, label: 'My Reviews', color: '#84a7f6' },
+    { icon: Edit3, label: 'Edit Profile', color: '#f68484', route: '/profile/edit' },
+    { icon: Baby, label: 'Manage Children', color: '#9cdcb8', route: '/children' },
+    { icon: FileText, label: 'My Applications', color: '#84a7f6', route: '/applications' },
+    { icon: Calendar, label: 'Application History', color: '#f6cc84', route: '/applications/history' },
     { icon: CreditCard, label: 'Payment Methods', color: '#f6cc84' },
     { icon: Bell, label: 'Notifications', color: '#bd84f6' },
     { icon: Settings, label: 'App Settings', color: '#f684a3' },
     { icon: Shield, label: 'Privacy & Safety', color: '#9cdcb8' },
     { icon: HelpCircle, label: 'Help & Support', color: '#84a7f6' },
   ];
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
 
   return (
     <View style={styles.container}>
@@ -33,37 +86,102 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>JS</Text>
-              </View>
+              {userData.profilePictureUrl ? (
+                <Image source={{ uri: userData.profilePictureUrl }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {getInitials(userData.firstName, userData.lastName)}
+                  </Text>
+                </View>
+              )}
               <Pressable style={styles.editAvatarButton}>
                 <Edit3 size={14} color="#ffffff" />
               </Pressable>
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>John Smith</Text>
-              <Text style={styles.profileEmail}>john.smith@email.com</Text>
-              <Text style={styles.memberSince}>Member since January 2024</Text>
+              <Text style={styles.profileName}>
+                {userData.firstName} {userData.lastName}
+              </Text>
+              <Text style={styles.profileEmail}>{userData.email}</Text>
+              <Text style={styles.memberSince}>
+                Member since {new Date(userData.memberSince).toLocaleDateString('en-US', { 
+                  month: 'long', 
+                  year: 'numeric' 
+                })}
+              </Text>
+            </View>
+          </View>
+
+          {/* Contact Information */}
+          <View style={styles.contactSection}>
+            <View style={styles.contactItem}>
+              <Phone size={16} color="#6b7280" />
+              <Text style={styles.contactText}>{userData.phoneNumber}</Text>
+            </View>
+            <View style={styles.contactItem}>
+              <Mail size={16} color="#6b7280" />
+              <Text style={styles.contactText}>{userData.email}</Text>
+            </View>
+            <View style={styles.contactItem}>
+              <MapPin size={16} color="#6b7280" />
+              <Text style={styles.contactText}>{userData.address}</Text>
             </View>
           </View>
           
           {/* Stats */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Bookings</Text>
+              <Text style={styles.statNumber}>{userData.stats.applications}</Text>
+              <Text style={styles.statLabel}>Applications</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>4.9</Text>
-              <Text style={styles.statLabel}>Rating</Text>
+              <Text style={styles.statNumber}>{userData.stats.acceptedApplications}</Text>
+              <Text style={styles.statLabel}>Accepted</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>8</Text>
-              <Text style={styles.statLabel}>Reviews</Text>
+              <Text style={styles.statNumber}>{userData.stats.activeEnrollments}</Text>
+              <Text style={styles.statLabel}>Enrolled</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Children Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Children</Text>
+          
+          <View style={styles.childrenContainer}>
+            {userData.children.map((child) => (
+              <View key={child.id} style={styles.childCard}>
+                <View style={styles.childAvatar}>
+                  {child.profilePictureUrl ? (
+                    <Image source={{ uri: child.profilePictureUrl }} style={styles.childAvatarImage} />
+                  ) : (
+                    <Text style={styles.childAvatarText}>
+                      {getInitials(child.firstName, child.lastName)}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.childInfo}>
+                  <Text style={styles.childName}>
+                    {child.firstName} {child.lastName}
+                  </Text>
+                  <Text style={styles.childDetails}>
+                    {calculateAge(child.dateOfBirth)} years old • {child.gender}
+                  </Text>
+                  <Text style={styles.childBirthdate}>
+                    Born: {new Date(child.dateOfBirth).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            
+            <Pressable style={styles.addChildButton}>
+              <Text style={styles.addChildText}>+ Add Child</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -72,14 +190,14 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
           <View style={styles.quickActionsContainer}>
-            <Pressable style={[styles.quickActionButton, { backgroundColor: '#f68484' }]}>
-              <Calendar size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Book Now</Text>
+            <Pressable style={[styles.quickActionButton, { backgroundColor: '#84a7f6' }]}>
+              <FileText size={24} color="#ffffff" />
+              <Text style={styles.quickActionText}>New Application</Text>
             </Pressable>
             
-            <Pressable style={[styles.quickActionButton, { backgroundColor: '#9cdcb8' }]}>
-              <Star size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Leave Review</Text>
+            <Pressable style={[styles.quickActionButton, { backgroundColor: '#f68484' }]}>
+              <Baby size={24} color="#ffffff" />
+              <Text style={styles.quickActionText}>Add Child</Text>
             </Pressable>
           </View>
         </View>
@@ -165,7 +283,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 24,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   avatarContainer: {
     position: 'relative',
@@ -215,6 +333,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
   },
+  contactSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contactText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginLeft: 8,
+    flex: 1,
+  },
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -239,6 +372,69 @@ const styles = StyleSheet.create({
     width: 1,
     height: 32,
     backgroundColor: '#e5e7eb',
+  },
+  childrenContainer: {
+    gap: 12,
+  },
+  childCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  childAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#9cdcb8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  childAvatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  childAvatarText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  childInfo: {
+    flex: 1,
+  },
+  childName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  childDetails: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  childBirthdate: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  addChildButton: {
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#bd4ab5',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  addChildText: {
+    color: '#bd4ab5',
+    fontSize: 16,
+    fontWeight: '600',
   },
   section: {
     backgroundColor: '#ffffff',

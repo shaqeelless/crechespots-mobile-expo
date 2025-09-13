@@ -9,93 +9,89 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Menu, Bell, MapPin, Star, Clock, Users, Navigation } from 'lucide-react-native';
+import { Menu, Bell, MapPin, Star, Clock, Users, Navigation, Heart, MessageCircle, Share2 } from 'lucide-react-native';
 import SideMenu from '@/components/SideMenu';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
+import { supabase } from '@/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
-const featuredCreches = [
+const articlePosts = [
   {
     id: 1,
-    name: 'Little Learners Academy',
+    title: 'Fun Learning Activities for Toddlers',
+    content: 'Today we explored colors and shapes with our little ones! The children had so much fun with our rainbow sensory bins and shape sorting games. 🌈',
+    author: 'Little Learners Academy',
+    authorImage: 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
     image: 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
-    rating: 4.9,
-    reviews: 127,
+    hearts: 24,
+    comments: 8,
     location: 'Downtown',
-    price: '€45/day',
     distance: '0.3 km',
-    verified: true,
+    timeAgo: '2 hours ago',
+    crecheId: 1,
   },
   {
     id: 2,
-    name: 'Happy Kids Daycare',
+    title: 'Outdoor Play Day Success!',
+    content: 'What a beautiful day for outdoor activities! Our children enjoyed nature walks, sandbox play, and garden exploration. Fresh air and exercise are so important for growing minds! 🌱',
+    author: 'Happy Kids Daycare',
+    authorImage: 'https://images.pexels.com/photos/8613074/pexels-photo-8613074.jpeg',
     image: 'https://images.pexels.com/photos/8613074/pexels-photo-8613074.jpeg',
-    rating: 4.8,
-    reviews: 89,
+    hearts: 31,
+    comments: 12,
     location: 'City Center',
-    price: '€40/day',
     distance: '0.8 km',
-    verified: true,
+    timeAgo: '4 hours ago',
+    crecheId: 2,
   },
   {
     id: 3,
-    name: 'Bright Beginnings',
+    title: 'Art & Creativity Workshop',
+    content: 'Our little artists created masterpieces today! Finger painting, clay modeling, and collage making. Every child is an artist in their own special way! 🎨',
+    author: 'Bright Beginnings',
+    authorImage: 'https://images.pexels.com/photos/8535231/pexels-photo-8535231.jpeg',
     image: 'https://images.pexels.com/photos/8535231/pexels-photo-8535231.jpeg',
-    rating: 4.7,
-    reviews: 64,
+    hearts: 18,
+    comments: 5,
     location: 'Suburbs',
-    price: '€35/day',
     distance: '1.2 km',
-    verified: true,
+    timeAgo: '6 hours ago',
+    crecheId: 3,
   },
 ];
 
-const availableSpots = [
+const myApplications = [
   {
     id: 1,
+    childName: 'Emma Smith',
     crecheName: 'Little Learners Academy',
     image: 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
-    spotsAvailable: 3,
-    ageGroup: '2-4 years',
-    duration: 'Full-time',
-    price: '€45/day',
+    status: 'Under Review',
+    appliedDate: '2024-01-15',
+    statusColor: '#f6cc84',
     location: 'Downtown',
-    distance: '0.3 km',
   },
   {
     id: 2,
+    childName: 'Emma Smith',
     crecheName: 'Happy Kids Daycare',
     image: 'https://images.pexels.com/photos/8613074/pexels-photo-8613074.jpeg',
-    spotsAvailable: 2,
-    ageGroup: '1-3 years',
-    duration: 'Part-time',
-    price: '€40/day',
+    status: 'Accepted',
+    appliedDate: '2024-01-10',
+    statusColor: '#9cdcb8',
     location: 'City Center',
-    distance: '0.8 km',
   },
   {
     id: 3,
+    childName: 'Liam Smith',
     crecheName: 'Bright Beginnings',
     image: 'https://images.pexels.com/photos/8535231/pexels-photo-8535231.jpeg',
-    spotsAvailable: 5,
-    ageGroup: '3-5 years',
-    duration: 'Full-time',
-    price: '€35/day',
+    status: 'Pending Documents',
+    appliedDate: '2024-01-12',
+    statusColor: '#f68484',
     location: 'Suburbs',
-    distance: '1.2 km',
-  },
-  {
-    id: 4,
-    crecheName: 'Sunshine Preschool',
-    image: 'https://images.pexels.com/photos/8613293/pexels-photo-8613293.jpeg',
-    spotsAvailable: 1,
-    ageGroup: '4-6 years',
-    duration: 'After-school',
-    price: '€30/day',
-    location: 'Westside',
-    distance: '1.5 km',
   },
 ];
 
@@ -105,11 +101,74 @@ export default function HomeScreen() {
   const [address, setAddress] = useState('📍 Getting location...');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [posts, setPosts] = useState(articlePosts);
+  const [applications, setApplications] = useState(myApplications);
   const router = useRouter();
 
   useEffect(() => {
     getLocation();
+    fetchNearbyPosts();
+    fetchMyApplications();
   }, []);
+
+  const fetchNearbyPosts = async () => {
+    try {
+      // In a real app, this would fetch posts from nearby creches
+      // For now, we'll use the mock data
+      setPosts(articlePosts);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    }
+  };
+
+  const fetchMyApplications = async () => {
+    try {
+      // Fetch user's applications from Supabase
+      const { data, error } = await supabase
+        .from('applications')
+        .select(`
+          *,
+          creches(name, header_image),
+          children(first_name, last_name)
+        `)
+        .limit(3);
+
+      if (error) throw error;
+      
+      if (data) {
+        const formattedApplications = data.map(app => ({
+          id: app.id,
+          childName: `${app.children?.first_name} ${app.children?.last_name}`,
+          crecheName: app.creches?.name,
+          image: app.creches?.header_image,
+          status: app.application_status,
+          appliedDate: app.created_at,
+          statusColor: getStatusColor(app.application_status),
+          location: 'Location', // You might want to add location to creches table
+        }));
+        setApplications(formattedApplications);
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      // Keep using mock data on error
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+      case 'accepted':
+        return '#9cdcb8';
+      case 'pending':
+      case 'under review':
+        return '#f6cc84';
+      case 'declined':
+      case 'rejected':
+        return '#f68484';
+      default:
+        return '#84a7f6';
+    }
+  };
 
   const getLocation = async () => {
     try {
@@ -173,73 +232,84 @@ export default function HomeScreen() {
     await getLocation();
   };
 
-  const renderCrecheCard = (creche: any) => (
+  const handleLikePost = (postId: number) => {
+    setPosts(posts.map(post => 
+      post.id === postId 
+        ? { ...post, hearts: post.hearts + 1 }
+        : post
+    ));
+  };
+
+  const renderPostCard = (post: any) => (
     <Pressable 
-      key={creche.id} 
-      style={styles.crecheCard}
-      onPress={() => router.push(`/search/${creche.id}`)}
+      key={post.id} 
+      style={styles.postCard}
+      onPress={() => router.push(`/search/${post.crecheId}`)}
     >
-      <Image source={{ uri: creche.image }} style={styles.crecheImage} />
-      
-      {creche.verified && (
-        <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedText}>✓</Text>
+      {/* Post Header */}
+      <View style={styles.postHeader}>
+        <Image source={{ uri: post.authorImage }} style={styles.authorAvatar} />
+        <View style={styles.postHeaderInfo}>
+          <Text style={styles.authorName}>{post.author}</Text>
+          <View style={styles.postMeta}>
+            <MapPin size={12} color="#9ca3af" />
+            <Text style={styles.postLocation}>{post.location} • {post.distance}</Text>
+            <Text style={styles.postTime}> • {post.timeAgo}</Text>
+          </View>
         </View>
+      </View>
+      
+      {/* Post Content */}
+      <Text style={styles.postTitle}>{post.title}</Text>
+      <Text style={styles.postContent}>{post.content}</Text>
+      
+      {/* Post Image */}
+      {post.image && (
+        <Image source={{ uri: post.image }} style={styles.postImage} />
       )}
       
-      <View style={styles.crecheContent}>
-        <Text style={styles.crecheName}>{creche.name}</Text>
+      {/* Post Actions */}
+      <View style={styles.postActions}>
+        <Pressable 
+          style={styles.actionButton}
+          onPress={() => handleLikePost(post.id)}
+        >
+          <Heart size={20} color="#f68484" />
+          <Text style={styles.actionText}>{post.hearts}</Text>
+        </Pressable>
         
-        <View style={styles.crecheInfo}>
-          <View style={styles.ratingContainer}>
-            <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.rating}>{creche.rating}</Text>
-            <Text style={styles.reviews}>({creche.reviews})</Text>
-          </View>
-          
-          <View style={styles.locationContainer}>
-            <MapPin size={12} color="#9ca3af" />
-            <Text style={styles.location}>{creche.location} • {creche.distance}</Text>
-          </View>
-        </View>
+        <Pressable style={styles.actionButton}>
+          <MessageCircle size={20} color="#84a7f6" />
+          <Text style={styles.actionText}>{post.comments}</Text>
+        </Pressable>
         
-        <Text style={styles.price}>{creche.price}</Text>
+        <Pressable style={styles.actionButton}>
+          <Share2 size={20} color="#9ca3af" />
+        </Pressable>
       </View>
     </Pressable>
   );
 
-  const renderSpotCard = (spot: any) => (
+  const renderApplicationCard = (application: any) => (
     <Pressable 
-      key={spot.id} 
-      style={styles.spotCard}
-      onPress={() => router.push(`/search/${spot.id}`)}
+      key={application.id} 
+      style={styles.applicationCard}
+      onPress={() => router.push(`/applications/${application.id}`)}
     >
-      <Image source={{ uri: spot.image }} style={styles.spotImage} />
+      <Image source={{ uri: application.image }} style={styles.applicationImage} />
       
-      <View style={styles.spotContent}>
-        <Text style={styles.spotCrecheName}>{spot.crecheName}</Text>
+      <View style={styles.applicationContent}>
+        <Text style={styles.applicationChild}>{application.childName}</Text>
+        <Text style={styles.applicationCreche}>{application.crecheName}</Text>
         
-        <View style={styles.spotAvailability}>
-          <View style={styles.spotsContainer}>
-            <Users size={12} color="#22c55e" />
-            <Text style={styles.spotsText}>{spot.spotsAvailable} spots left</Text>
+        <View style={styles.applicationStatus}>
+          <View style={[styles.statusBadge, { backgroundColor: application.statusColor }]}>
+            <Text style={styles.statusText}>{application.status}</Text>
           </View>
-          <Text style={styles.ageGroup}>{spot.ageGroup}</Text>
         </View>
         
-        <View style={styles.spotDetails}>
-          <View style={styles.detailRow}>
-            <MapPin size={12} color="#9ca3af" />
-            <Text style={styles.detailText}>{spot.location} • {spot.distance}</Text>
-          </View>
-          <Text style={styles.duration}>{spot.duration}</Text>
-        </View>
-        
-        <View style={styles.spotFooter}>
-          <Text style={styles.spotPrice}>{spot.price}</Text>
-          <Pressable style={styles.bookButton}>
-            <Text style={styles.bookButtonText}>Book Now</Text>
-          </Pressable>
+        <View style={styles.applicationFooter}>
+          <Text style={styles.appliedDate}>Applied: {new Date(application.appliedDate).toLocaleDateString()}</Text>
         </View>
       </View>
     </Pressable>
@@ -329,47 +399,57 @@ export default function HomeScreen() {
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <Pressable style={[styles.actionButton, { backgroundColor: '#f68484' }]}>
+          <Pressable 
+            style={[styles.quickActionButton, { backgroundColor: '#f68484' }]}
+            onPress={() => router.push('/search')}
+          >
             <Text style={styles.actionEmoji}>🔍</Text>
-            <Text style={styles.actionText}>Find Care</Text>
+            <Text style={styles.quickActionText}>Find Creches</Text>
           </Pressable>
           
-          <Pressable style={[styles.actionButton, { backgroundColor: '#9cdcb8' }]}>
-            <Text style={styles.actionEmoji}>📅</Text>
-            <Text style={styles.actionText}>My Bookings</Text>
+          <Pressable 
+            style={[styles.quickActionButton, { backgroundColor: '#9cdcb8' }]}
+            onPress={() => router.push('/children')}
+          >
+            <Text style={styles.actionEmoji}>👶</Text>
+            <Text style={styles.quickActionText}>My Children</Text>
           </Pressable>
           
-          <Pressable style={[styles.actionButton, { backgroundColor: '#84a7f6' }]}>
-            <Text style={styles.actionEmoji}>⭐</Text>
-            <Text style={styles.actionText}>Reviews</Text>
+          <Pressable 
+            style={[styles.quickActionButton, { backgroundColor: '#84a7f6' }]}
+            onPress={() => router.push('/applications')}
+          >
+            <Text style={styles.actionEmoji}>📋</Text>
+            <Text style={styles.quickActionText}>Applications</Text>
           </Pressable>
           
-          <Pressable style={[styles.actionButton, { backgroundColor: '#f6cc84' }]}>
+          <Pressable 
+            style={[styles.quickActionButton, { backgroundColor: '#f6cc84' }]}
+            onPress={() => router.push('/(tabs)/messages')}
+          >
             <Text style={styles.actionEmoji}>💬</Text>
-            <Text style={styles.actionText}>Messages</Text>
+            <Text style={styles.quickActionText}>Messages</Text>
           </Pressable>
         </View>
 
-        {/* Featured Section */}
+        {/* Community Posts Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Featured Creches</Text>
-          <Text style={styles.sectionSubtitle}>Highly rated childcare near you</Text>
+          <Text style={styles.sectionTitle}>Community Updates</Text>
+          <Text style={styles.sectionSubtitle}>Latest posts from creches near you</Text>
           
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.crechesContainer}>
-              {featuredCreches.map(renderCrecheCard)}
-            </View>
-          </ScrollView>
+          <View style={styles.postsContainer}>
+            {posts.map(renderPostCard)}
+          </View>
         </View>
 
-        {/* Available Spots Section */}
+        {/* My Applications Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Spots</Text>
-          <Text style={styles.sectionSubtitle}>Limited availability - Book now!</Text>
+          <Text style={styles.sectionTitle}>My Applications</Text>
+          <Text style={styles.sectionSubtitle}>Track your application progress</Text>
           
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.spotsListContainer}>
-              {availableSpots.map(renderSpotCard)}
+            <View style={styles.applicationsContainer}>
+              {applications.map(renderApplicationCard)}
             </View>
           </ScrollView>
         </View>
@@ -380,24 +460,24 @@ export default function HomeScreen() {
           
           <View style={styles.activityItem}>
             <View style={[styles.activityIcon, { backgroundColor: '#9cdcb8' }]}>
-              <Clock size={16} color="#ffffff" />
+              <Users size={16} color="#ffffff" />
             </View>
             <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Booking Confirmed</Text>
+              <Text style={styles.activityTitle}>Application Accepted</Text>
               <Text style={styles.activityDescription}>
-                Little Learners Academy - Tomorrow at 8:00 AM
+                Emma's application to Happy Kids Daycare was approved!
               </Text>
             </View>
           </View>
           
           <View style={styles.activityItem}>
-            <View style={[styles.activityIcon, { backgroundColor: '#84a7f6' }]}>
-              <Star size={16} color="#ffffff" />
+            <View style={[styles.activityIcon, { backgroundColor: '#f6cc84' }]}>
+              <Clock size={16} color="#ffffff" />
             </View>
             <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Review Reminder</Text>
+              <Text style={styles.activityTitle}>Documents Required</Text>
               <Text style={styles.activityDescription}>
-                How was your experience at Happy Kids Daycare?
+                Please upload vaccination records for Liam's application
               </Text>
             </View>
           </View>
@@ -508,7 +588,7 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     gap: 12,
   },
-  actionButton: {
+  quickActionButton: {
     flex: 1,
     padding: 16,
     borderRadius: 12,
@@ -519,7 +599,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginBottom: 8,
   },
-  actionText: {
+  quickActionText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
@@ -540,12 +620,91 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 20,
   },
-  crechesContainer: {
+  postsContainer: {
+    gap: 20,
+  },
+  postCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  authorAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  postHeaderInfo: {
+    flex: 1,
+  },
+  authorName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  postMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  postLocation: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginLeft: 4,
+  },
+  postTime: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  postTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  postContent: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  postActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  applicationsContainer: {
     flexDirection: 'row',
     gap: 16,
   },
-  crecheCard: {
-    width: width * 0.75,
+  applicationCard: {
+    width: width * 0.7,
     backgroundColor: '#ffffff',
     borderRadius: 16,
     overflow: 'hidden',
@@ -555,69 +714,84 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  crecheImage: {
+  applicationImage: {
     width: '100%',
-    height: 160,
+    height: 120,
     backgroundColor: '#e5e7eb',
   },
-  verifiedBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#22c55e',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifiedText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  crecheContent: {
+  applicationContent: {
     padding: 16,
   },
-  crecheName: {
+  applicationChild: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#374151',
-    marginBottom: 8,
-  },
-  crecheInfo: {
-    marginBottom: 8,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 4,
   },
-  rating: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 4,
-  },
-  reviews: {
+  applicationCreche: {
     fontSize: 14,
     color: '#6b7280',
-    marginLeft: 4,
+    marginBottom: 8,
   },
-  locationContainer: {
+  applicationStatus: {
+    marginBottom: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  applicationFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 8,
+  },
+  appliedDate: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  location: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 4,
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  price: {
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#bd4ab5',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 2,
   },
+  activityDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+});
+
   // Spot Card Styles
   spotsContainer: {
     flexDirection: 'row',

@@ -53,6 +53,11 @@ export default function SearchScreen() {
     router.push(`/search/${crecheId}`);
   };
 
+  const handleApplyPress = (crecheId: string) => {
+    // Navigate to application form
+    router.push(`/apply/${crecheId}`);
+  };
+
   const renderSearchResult = (result: any) => (
     <Pressable 
       key={result.id} 
@@ -103,14 +108,25 @@ export default function SearchScreen() {
         </View>
         
         <View style={styles.resultFooter}>
-          <Text style={styles.price}>
-            {result.monthly_price ? `R${result.monthly_price}/month` : 
-             result.weekly_price ? `R${result.weekly_price}/week` : 
-             result.price ? `R${result.price}/day` : 'Contact for pricing'}
-          </Text>
-          <Text style={[styles.availability, { color: '#22c55e' }]}>
-            Available
-          </Text>
+          <View style={styles.priceContainer}>
+            <Text style={styles.price}>
+              {result.monthly_price ? `R${result.monthly_price}/month` : 
+               result.weekly_price ? `R${result.weekly_price}/week` : 
+               result.price ? `R${result.price}/day` : 'Contact for pricing'}
+            </Text>
+            <Text style={[styles.availability, { color: '#22c55e' }]}>
+              Accepting Applications
+            </Text>
+          </View>
+          <Pressable 
+            style={styles.applyButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleApplyPress(result.id);
+            }}
+          >
+            <Text style={styles.applyButtonText}>Apply Now</Text>
+          </Pressable>
         </View>
       </View>
     </Pressable>
@@ -433,12 +449,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  priceContainer: {
+    flex: 1,
+  },
   price: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#bd4ab5',
+    marginBottom: 2,
   },
   availability: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  applyButton: {
+    backgroundColor: '#bd4ab5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  applyButtonText: {
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
   },

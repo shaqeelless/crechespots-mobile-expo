@@ -317,11 +317,14 @@ export default function CrecheDetailScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionSection}>
-          <Pressable style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Book a Visit</Text>
+          <Pressable style={styles.primaryButton} onPress={() => router.push(`/apply/${creche.id}`)}>
+            <Text style={styles.primaryButtonText}>Apply Now</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Save to Favorites</Text>
+          </Pressable>
+          <Pressable style={styles.tertiaryButton}>
+            <Text style={styles.tertiaryButtonText}>Schedule Visit</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -534,6 +537,19 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tertiaryButton: {
+    backgroundColor: 'transparent',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#bd4ab5',
+  },
+  tertiaryButtonText: {
+    color: '#bd4ab5',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -15,6 +15,9 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)/login" />
         <Stack.Screen name="(auth)/provider-register" />
         <Stack.Screen name="search/[id]" />
+        <Stack.Screen name="apply/[id]" />
+        <Stack.Screen name="children/index" />
+        <Stack.Screen name="applications/index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>
