@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, FileText, Calendar } from 'lucide-react-native';
+import { ArrowLeft, Clock, CircleCheck as CheckCircle, Circle as XCircle, CircleAlert as AlertCircle, FileText, Calendar } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 interface Application {
