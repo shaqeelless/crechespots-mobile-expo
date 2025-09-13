@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Plus, Edit3, Calendar, User } from 'lucide-react-native';
+import { ArrowLeft, Plus, CreditCard as Edit3, Calendar, User } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 interface Child {
