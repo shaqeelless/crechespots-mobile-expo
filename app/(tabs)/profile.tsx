@@ -12,9 +12,97 @@ import { useRouter } from 'expo-router';
 import { User, CreditCard as Edit3, Calendar, Star, CreditCard, Settings, Bell, Shield, CircleHelp as HelpCircle, Baby, FileText, MapPin, Phone, Mail, LogOut } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 
+const ProfileSkeleton = () => (
+  <View style={styles.container}>
+    {/* Header Skeleton */}
+    <View style={styles.header}>
+      <View style={[styles.skeletonText, { width: 80, height: 24, backgroundColor: '#e5e7eb' }]} />
+    </View>
+
+    <ScrollView style={styles.content}>
+      {/* Profile Section Skeleton */}
+      <View style={styles.profileSection}>
+        <View style={styles.profileHeader}>
+          <View style={[styles.avatar, { backgroundColor: '#e5e7eb' }]} />
+          <View style={styles.profileInfo}>
+            <View style={[styles.skeletonText, { width: '60%', height: 20, marginBottom: 8 }]} />
+            <View style={[styles.skeletonText, { width: '80%', height: 16, marginBottom: 4 }]} />
+            <View style={[styles.skeletonText, { width: '40%', height: 14 }]} />
+          </View>
+        </View>
+
+        {/* Contact Information Skeleton */}
+        <View style={styles.contactSection}>
+          <View style={[styles.skeletonText, { width: '70%', height: 16, marginBottom: 8 }]} />
+          <View style={[styles.skeletonText, { width: '90%', height: 16, marginBottom: 8 }]} />
+          <View style={[styles.skeletonText, { width: '60%', height: 16 }]} />
+        </View>
+        
+        {/* Stats Skeleton */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <View style={[styles.skeletonText, { width: 30, height: 20, marginBottom: 4 }]} />
+            <View style={[styles.skeletonText, { width: 50, height: 12 }]} />
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <View style={[styles.skeletonText, { width: 30, height: 20, marginBottom: 4 }]} />
+            <View style={[styles.skeletonText, { width: 50, height: 12 }]} />
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <View style={[styles.skeletonText, { width: 30, height: 20, marginBottom: 4 }]} />
+            <View style={[styles.skeletonText, { width: 50, height: 12 }]} />
+          </View>
+        </View>
+      </View>
+
+      {/* Quick Actions Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeletonText, { width: 120, height: 18, marginBottom: 16 }]} />
+        <View style={styles.quickActionsContainer}>
+          <View style={[styles.quickActionButton, { backgroundColor: '#e5e7eb' }]} />
+          <View style={[styles.quickActionButton, { backgroundColor: '#e5e7eb' }]} />
+        </View>
+      </View>
+
+      {/* Menu Items Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeletonText, { width: 150, height: 18, marginBottom: 16 }]} />
+        <View style={styles.menuContainer}>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => (
+            <View key={item} style={styles.menuItem}>
+              <View style={[styles.menuIcon, { backgroundColor: '#e5e7eb' }]} />
+              <View style={[styles.skeletonText, { width: '60%', height: 16 }]} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Sign Out Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.signOutButton, { backgroundColor: '#e5e7eb' }]} />
+      </View>
+
+      {/* App Info Skeleton */}
+      <View style={styles.section}>
+        <View style={styles.appInfoContainer}>
+          <View style={styles.logoContainer}>
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <View key={item} style={[styles.letterBlock, { backgroundColor: '#e5e7eb' }]} />
+            ))}
+          </View>
+          <View style={[styles.skeletonText, { width: 80, height: 16, marginBottom: 8 }]} />
+          <View style={[styles.skeletonText, { width: 60, height: 12 }]} />
+        </View>
+      </View>
+    </ScrollView>
+  </View>
+);
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, loading: authLoading } = useAuth();
 
   const profileMenuItems = [
     { icon: Edit3, label: 'Edit Profile', color: '#f68484', route: '/profile/edit', onPress: () => router.push('/profile/edit') },
@@ -53,12 +141,8 @@ export default function ProfileScreen() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  if (!profile) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text>Loading profile...</Text>
-      </View>
-    );
+  if (authLoading || !profile) {
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -344,69 +428,6 @@ const styles = StyleSheet.create({
     height: 32,
     backgroundColor: '#e5e7eb',
   },
-  childrenContainer: {
-    gap: 12,
-  },
-  childCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  childAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#9cdcb8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  childAvatarImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  childAvatarText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  childInfo: {
-    flex: 1,
-  },
-  childName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 2,
-  },
-  childDetails: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  childBirthdate: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  addChildButton: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#bd4ab5',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-  },
-  addChildText: {
-    color: '#bd4ab5',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   section: {
     backgroundColor: '#ffffff',
     marginBottom: 24,
@@ -432,11 +453,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     opacity: 0.9,
+    height: 60,
   },
   quickActionText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  menuContainer: {
+    gap: 4,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
   },
   menuContainer: {
     gap: 4,
