@@ -1,0 +1,43 @@
+name: Deploy via SFTP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Expo Web App
+        run: npx expo export --platform web
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy to Production (main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.FTP_PASSWORD }}" > /tmp/password
+          sshpass -f /tmp/password sftp -oPort=1624 -oStrictHostKeyChecking=no njfhditm@102.212.247.146 <<EOF
+          cd /home/njfhditm/online.crechespots.co.za
+          lcd dist
+          put -r *
+          quit
+          EOF
+          rm /tmp/password
+
+          EOF
+          rm /tmp/password
