@@ -38,6 +38,3 @@ jobs:
           quit
           EOF
           rm /tmp/password
-
-          EOF
-          rm /tmp/password
