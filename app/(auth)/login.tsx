@@ -10,25 +10,37 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!formData.email || !formData.password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    // Here you would typically handle the login logic
-    console.log('Logging in user:', formData);
-    
-    // Navigate to main app
-    router.replace('/(tabs)');
+    try {
+      setLoading(true);
+      const { error } = await signIn(formData.email, formData.password);
+      
+      if (error) {
+        Alert.alert('Login Error', error.message);
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

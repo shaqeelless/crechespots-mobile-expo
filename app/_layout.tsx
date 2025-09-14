@@ -17,7 +17,11 @@ export default function RootLayout() {
         <Stack.Screen name="search/[id]" />
         <Stack.Screen name="apply/[id]" />
         <Stack.Screen name="children/index" />
+        <Stack.Screen name="children/add" />
+        <Stack.Screen name="children/invite" />
         <Stack.Screen name="applications/index" />
+        <Stack.Screen name="applications/history" />
+        <Stack.Screen name="profile/edit" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>

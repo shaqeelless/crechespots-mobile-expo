@@ -6,73 +6,60 @@ import {
   ScrollView,
   Pressable,
   Image,
+  Alert,
 } from 'react-native';
-import { User, CreditCard as Edit3, Calendar, Star, CreditCard, Settings, Bell, Shield, CircleHelp as HelpCircle, Baby, FileText, MapPin, Phone, Mail } from 'lucide-react-native';
-
-// Mock user data - in a real app, this would come from Supabase
-const userData = {
-  id: '1',
-  firstName: 'John',
-  lastName: 'Smith',
-  email: 'john.smith@email.com',
-  phoneNumber: '+27 82 123 4567',
-  profilePictureUrl: null,
-  address: '123 Main Street, Cape Town, Western Cape',
-  memberSince: '2024-01-01',
-  children: [
-    {
-      id: '1',
-      firstName: 'Emma',
-      lastName: 'Smith',
-      dateOfBirth: '2020-03-15',
-      gender: 'Female',
-      profilePictureUrl: null,
-    },
-    {
-      id: '2',
-      firstName: 'Liam',
-      lastName: 'Smith',
-      dateOfBirth: '2018-07-22',
-      gender: 'Male',
-      profilePictureUrl: null,
-    }
-  ],
-  stats: {
-    applications: 5,
-    acceptedApplications: 2,
-    activeEnrollments: 1,
-  }
-};
+import { useRouter } from 'expo-router';
+import { User, CreditCard as Edit3, Calendar, Star, CreditCard, Settings, Bell, Shield, CircleHelp as HelpCircle, Baby, FileText, MapPin, Phone, Mail, LogOut } from 'lucide-react-native';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const { user, profile, signOut } = useAuth();
+
   const profileMenuItems = [
-    { icon: Edit3, label: 'Edit Profile', color: '#f68484', route: '/profile/edit' },
-    { icon: Baby, label: 'Manage Children', color: '#9cdcb8', route: '/children' },
-    { icon: FileText, label: 'My Applications', color: '#84a7f6', route: '/applications' },
-    { icon: Calendar, label: 'Application History', color: '#f6cc84', route: '/applications/history' },
-    { icon: CreditCard, label: 'Payment Methods', color: '#f6cc84' },
-    { icon: Bell, label: 'Notifications', color: '#bd84f6' },
-    { icon: Settings, label: 'App Settings', color: '#f684a3' },
-    { icon: Shield, label: 'Privacy & Safety', color: '#9cdcb8' },
-    { icon: HelpCircle, label: 'Help & Support', color: '#84a7f6' },
+    { icon: Edit3, label: 'Edit Profile', color: '#f68484', route: '/profile/edit', onPress: () => router.push('/profile/edit') },
+    { icon: Baby, label: 'Manage Children', color: '#9cdcb8', route: '/children', onPress: () => router.push('/children') },
+    { icon: FileText, label: 'My Applications', color: '#84a7f6', route: '/applications', onPress: () => router.push('/applications') },
+    { icon: Calendar, label: 'Application History', color: '#f6cc84', route: '/applications/history', onPress: () => router.push('/applications/history') },
+    { icon: CreditCard, label: 'Payment Methods', color: '#f6cc84', onPress: () => {} },
+    { icon: Bell, label: 'Notifications', color: '#bd84f6', onPress: () => {} },
+    { icon: Settings, label: 'App Settings', color: '#f684a3', onPress: () => {} },
+    { icon: Shield, label: 'Privacy & Safety', color: '#9cdcb8', onPress: () => {} },
+    { icon: HelpCircle, label: 'Help & Support', color: '#84a7f6', onPress: () => {} },
   ];
 
-  const getInitials = (firstName: string, lastName: string) => {
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await signOut();
+            if (!error) {
+              router.replace('/(auth)/welcome');
+            }
+          }
+        },
+      ]
+    );
+  };
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName || !lastName) return 'U';
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
+  if (!profile) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -86,27 +73,27 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              {userData.profilePictureUrl ? (
-                <Image source={{ uri: userData.profilePictureUrl }} style={styles.avatar} />
+              {profile.profile_picture_url ? (
+                <Image source={{ uri: profile.profile_picture_url }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
-                    {getInitials(userData.firstName, userData.lastName)}
+                    {getInitials(profile.first_name, profile.last_name)}
                   </Text>
                 </View>
               )}
-              <Pressable style={styles.editAvatarButton}>
+              <Pressable style={styles.editAvatarButton} onPress={() => router.push('/profile/edit')}>
                 <Edit3 size={14} color="#ffffff" />
               </Pressable>
             </View>
             
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>
-                {userData.firstName} {userData.lastName}
+                {profile.first_name} {profile.last_name}
               </Text>
-              <Text style={styles.profileEmail}>{userData.email}</Text>
+              <Text style={styles.profileEmail}>{profile.email}</Text>
               <Text style={styles.memberSince}>
-                Member since {new Date(userData.memberSince).toLocaleDateString('en-US', { 
+                Member since {new Date(profile.created_at).toLocaleDateString('en-US', { 
                   month: 'long', 
                   year: 'numeric' 
                 })}
@@ -116,72 +103,42 @@ export default function ProfileScreen() {
 
           {/* Contact Information */}
           <View style={styles.contactSection}>
-            <View style={styles.contactItem}>
-              <Phone size={16} color="#6b7280" />
-              <Text style={styles.contactText}>{userData.phoneNumber}</Text>
-            </View>
+            {profile.phone_number && (
+              <View style={styles.contactItem}>
+                <Phone size={16} color="#6b7280" />
+                <Text style={styles.contactText}>{profile.phone_number}</Text>
+              </View>
+            )}
             <View style={styles.contactItem}>
               <Mail size={16} color="#6b7280" />
-              <Text style={styles.contactText}>{userData.email}</Text>
+              <Text style={styles.contactText}>{profile.email}</Text>
             </View>
-            <View style={styles.contactItem}>
-              <MapPin size={16} color="#6b7280" />
-              <Text style={styles.contactText}>{userData.address}</Text>
-            </View>
+            {(profile.city || profile.province) && (
+              <View style={styles.contactItem}>
+                <MapPin size={16} color="#6b7280" />
+                <Text style={styles.contactText}>
+                  {[profile.suburb, profile.city, profile.province].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+            )}
           </View>
           
           {/* Stats */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userData.stats.applications}</Text>
+              <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Applications</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userData.stats.acceptedApplications}</Text>
+              <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Accepted</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userData.stats.activeEnrollments}</Text>
+              <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Enrolled</Text>
             </View>
-          </View>
-        </View>
-
-        {/* Children Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Children</Text>
-          
-          <View style={styles.childrenContainer}>
-            {userData.children.map((child) => (
-              <View key={child.id} style={styles.childCard}>
-                <View style={styles.childAvatar}>
-                  {child.profilePictureUrl ? (
-                    <Image source={{ uri: child.profilePictureUrl }} style={styles.childAvatarImage} />
-                  ) : (
-                    <Text style={styles.childAvatarText}>
-                      {getInitials(child.firstName, child.lastName)}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.childInfo}>
-                  <Text style={styles.childName}>
-                    {child.firstName} {child.lastName}
-                  </Text>
-                  <Text style={styles.childDetails}>
-                    {calculateAge(child.dateOfBirth)} years old • {child.gender}
-                  </Text>
-                  <Text style={styles.childBirthdate}>
-                    Born: {new Date(child.dateOfBirth).toLocaleDateString()}
-                  </Text>
-                </View>
-              </View>
-            ))}
-            
-            <Pressable style={styles.addChildButton}>
-              <Text style={styles.addChildText}>+ Add Child</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -190,14 +147,20 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
           <View style={styles.quickActionsContainer}>
-            <Pressable style={[styles.quickActionButton, { backgroundColor: '#84a7f6' }]}>
+            <Pressable 
+              style={[styles.quickActionButton, { backgroundColor: '#84a7f6' }]}
+              onPress={() => router.push('/applications')}
+            >
               <FileText size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>New Application</Text>
+              <Text style={styles.quickActionText}>My Applications</Text>
             </Pressable>
             
-            <Pressable style={[styles.quickActionButton, { backgroundColor: '#f68484' }]}>
+            <Pressable 
+              style={[styles.quickActionButton, { backgroundColor: '#9cdcb8' }]}
+              onPress={() => router.push('/children')}
+            >
               <Baby size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Add Child</Text>
+              <Text style={styles.quickActionText}>Manage Children</Text>
             </Pressable>
           </View>
         </View>
@@ -210,7 +173,7 @@ export default function ProfileScreen() {
             {profileMenuItems.map((item, index) => {
               const IconComponent = item.icon;
               return (
-                <Pressable key={index} style={styles.menuItem}>
+                <Pressable key={index} style={styles.menuItem} onPress={item.onPress}>
                   <View style={[styles.menuIcon, { backgroundColor: item.color }]}>
                     <IconComponent size={20} color="#ffffff" />
                   </View>
@@ -220,6 +183,14 @@ export default function ProfileScreen() {
               );
             })}
           </View>
+        </View>
+
+        {/* Sign Out */}
+        <View style={styles.section}>
+          <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+            <LogOut size={20} color="#ef4444" />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </Pressable>
         </View>
 
         {/* App Info */}
@@ -527,5 +498,21 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  signOutText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

@@ -38,12 +38,10 @@ export default function ApplyScreen() {
   const [submitting, setSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
-    parentName: '',
-    parentPhone: '',
-    parentEmail: '',
-    parentAddress: '',
     message: '',
   });
+
+  const { profile } = useAuth();
 
   useEffect(() => {
     fetchData();
@@ -91,8 +89,8 @@ export default function ApplyScreen() {
       return;
     }
 
-    if (!formData.parentName || !formData.parentPhone || !formData.parentEmail) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!profile) {
+      Alert.alert('Error', 'Please complete your profile before applying');
       return;
     }
 
@@ -102,10 +100,10 @@ export default function ApplyScreen() {
       const applicationData = {
         creche_id: id,
         child_id: selectedChild,
-        parent_name: formData.parentName,
-        parent_phone_number: formData.parentPhone,
-        parent_email: formData.parentEmail,
-        parent_address: formData.parentAddress,
+        parent_name: `${profile.first_name} ${profile.last_name}`,
+        parent_phone_number: profile.phone_number || '',
+        parent_email: profile.email,
+        parent_address: [profile.suburb, profile.city, profile.province].filter(Boolean).join(', '),
         message: formData.message,
         source: 'mobile_app',
         application_status: 'New',
@@ -247,50 +245,47 @@ export default function ApplyScreen() {
 
         {/* Parent Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Parent Information</Text>
+          <Text style={styles.sectionTitle}>Parent Information (From Your Profile)</Text>
           
-          <View style={styles.inputContainer}>
-            <User size={20} color="#9ca3af" />
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name *"
-              value={formData.parentName}
-              onChangeText={(text) => setFormData({ ...formData, parentName: text })}
-            />
+          <View style={styles.infoDisplay}>
+            <View style={styles.infoRow}>
+              <User size={16} color="#6b7280" />
+              <Text style={styles.infoLabel}>Name:</Text>
+              <Text style={styles.infoValue}>
+                {profile ? `${profile.first_name} ${profile.last_name}` : 'Not set'}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Phone size={16} color="#6b7280" />
+              <Text style={styles.infoLabel}>Phone:</Text>
+              <Text style={styles.infoValue}>
+                {profile?.phone_number || 'Not set'}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Mail size={16} color="#6b7280" />
+              <Text style={styles.infoLabel}>Email:</Text>
+              <Text style={styles.infoValue}>
+                {profile?.email || 'Not set'}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <MapPin size={16} color="#6b7280" />
+              <Text style={styles.infoLabel}>Location:</Text>
+              <Text style={styles.infoValue}>
+                {profile ? [profile.suburb, profile.city, profile.province].filter(Boolean).join(', ') || 'Not set' : 'Not set'}
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Phone size={20} color="#9ca3af" />
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number *"
-              value={formData.parentPhone}
-              onChangeText={(text) => setFormData({ ...formData, parentPhone: text })}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Mail size={20} color="#9ca3af" />
-            <TextInput
-              style={styles.input}
-              placeholder="Email Address *"
-              value={formData.parentEmail}
-              onChangeText={(text) => setFormData({ ...formData, parentEmail: text })}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <User size={20} color="#9ca3af" />
-            <TextInput
-              style={styles.input}
-              placeholder="Home Address"
-              value={formData.parentAddress}
-              onChangeText={(text) => setFormData({ ...formData, parentAddress: text })}
-              multiline
-            />
+          <Pressable 
+            style={styles.editProfileButton}
+            onPress={() => router.push('/profile/edit')}
+          >
+            <Text style={styles.editProfileText}>Edit Profile Information</Text>
           </View>
         </View>
 
@@ -516,6 +511,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     minHeight: 80,
+  },
+  infoDisplay: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginLeft: 8,
+    width: 60,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#374151',
+    flex: 1,
+    marginLeft: 8,
+  },
+  editProfileButton: {
+    backgroundColor: '#bd4ab5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  editProfileText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   submitSection: {
     padding: 20,

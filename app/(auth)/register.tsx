@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock, User, Phone } from 'lucide-react-native';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -21,8 +23,9 @@ export default function RegisterScreen() {
     password: '',
     confirmPassword: '',
   });
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
@@ -33,11 +36,28 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Here you would typically handle the registration logic
-    console.log('Registering user:', formData);
-    
-    // Navigate to main app
-    router.replace('/(tabs)');
+    try {
+      setLoading(true);
+      const { error } = await signUp(formData.email, formData.password, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+      });
+      
+      if (error) {
+        Alert.alert('Registration Error', error.message);
+      } else {
+        Alert.alert(
+          'Success!', 
+          'Account created successfully. Please check your email to verify your account.',
+          [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
