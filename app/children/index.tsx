@@ -22,6 +22,21 @@ interface Child {
   created_at: string;
 }
 
+const ChildCardSkeleton = () => (
+  <View style={[styles.childCard, styles.skeletonCard]}>
+    <View style={[styles.childAvatar, styles.skeletonAvatar]} />
+    <View style={styles.childInfo}>
+      <View style={[styles.skeletonText, { width: '60%', height: 20, marginBottom: 8 }]} />
+      <View style={styles.childDetails}>
+        <View style={[styles.skeletonText, { width: 80, height: 16 }]} />
+        <View style={[styles.skeletonText, { width: 60, height: 16 }]} />
+      </View>
+      <View style={[styles.skeletonText, { width: '40%', height: 14, marginTop: 4 }]} />
+    </View>
+    <View style={[styles.editButton, styles.skeletonButton]} />
+  </View>
+);
+
 export default function ChildrenScreen() {
   const router = useRouter();
   const [children, setChildren] = useState<Child[]>([]);
@@ -133,8 +148,10 @@ export default function ChildrenScreen() {
 
       <ScrollView style={styles.content}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading children...</Text>
+          <View style={styles.childrenContainer}>
+            <ChildCardSkeleton />
+            <ChildCardSkeleton />
+            <ChildCardSkeleton />
           </View>
         ) : children.length > 0 ? (
           <View style={styles.childrenContainer}>
@@ -202,16 +219,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
   childrenContainer: {
     gap: 16,
   },
@@ -227,6 +234,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  skeletonCard: {
+    opacity: 0.7,
+  },
   childAvatar: {
     width: 60,
     height: 60,
@@ -235,6 +245,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
+  },
+  skeletonAvatar: {
+    backgroundColor: '#e5e7eb',
   },
   childAvatarImage: {
     width: 60,
@@ -283,6 +296,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+  skeletonButton: {
+    backgroundColor: '#e5e7eb',
+    borderColor: '#d1d5db',
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -320,5 +337,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  skeletonText: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
   },
 });
