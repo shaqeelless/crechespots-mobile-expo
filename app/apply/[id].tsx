@@ -10,8 +10,9 @@ import {
   Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, User, Phone, Mail, MessageCircle, Baby } from 'lucide-react-native';
+import { ArrowLeft, User, Phone, Mail, MessageCircle, Baby, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface Child {
   id: string;
@@ -286,7 +287,7 @@ export default function ApplyScreen() {
             onPress={() => router.push('/profile/edit')}
           >
             <Text style={styles.editProfileText}>Edit Profile Information</Text>
-          </View>
+          </Pressable>
         </View>
 
         {/* Message */}
