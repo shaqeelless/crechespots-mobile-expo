@@ -18,6 +18,7 @@ export default function RootLayout() {
         <Stack.Screen name="search/[id]" />
         <Stack.Screen name="apply/[id]" />
         <Stack.Screen name="children/index" />
+        <Stack.Screen name="children/[id]" />
         <Stack.Screen name="children/add" />
         <Stack.Screen name="children/invite" />
         <Stack.Screen name="applications/index" />
