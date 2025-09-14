@@ -10,7 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Search, MapPin, Star, Filter, SlidersHorizontal } from 'lucide-react-native';
+import { Search, MapPin, Star, Filter, SlidersHorizontal, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
@@ -19,13 +19,20 @@ const { width } = Dimensions.get('window');
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [creches, setCreches] = useState([]);
+  const [filteredCreches, setFilteredCreches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const router = useRouter(); // Add router hook
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetchCreches();
   }, []);
+
+  useEffect(() => {
+    filterCreches();
+  }, [searchQuery, creches, activeFilter]);
 
   const fetchCreches = async () => {
     try {
@@ -40,6 +47,7 @@ export default function SearchScreen() {
       }
 
       setCreches(data || []);
+      setFilteredCreches(data || []);
     } catch (err) {
       console.error('Error fetching creches:', err);
       setError(err.message);
@@ -48,21 +56,67 @@ export default function SearchScreen() {
     }
   };
 
+  const filterCreches = () => {
+    let filtered = [...creches];
+
+    // Apply search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(creche =>
+        creche.name?.toLowerCase().includes(query) ||
+        creche.suburb?.toLowerCase().includes(query) ||
+        creche.city?.toLowerCase().includes(query) ||
+        creche.province?.toLowerCase().includes(query) ||
+        creche.address?.toLowerCase().includes(query) ||
+        (creche.services && Object.keys(creche.services).some(service =>
+          service.toLowerCase().includes(query)
+        ))
+      );
+    }
+
+    // Apply active filter
+    switch (activeFilter) {
+      case 'verified':
+        filtered = filtered.filter(creche => creche.registered === true);
+        break;
+      case 'available':
+        filtered = filtered.filter(creche => creche.accepting_applications === true);
+        break;
+      case 'budget':
+        // Filter for creches with monthly price under R2000
+        filtered = filtered.filter(creche => 
+          creche.monthly_price && creche.monthly_price <= 2000
+        );
+        break;
+      case 'nearby':
+        // For now, just show all since we don't have location data
+        // In a real app, you'd filter by distance using geolocation
+        break;
+      default:
+        // 'all' filter - show everything
+        break;
+    }
+
+    setFilteredCreches(filtered);
+  };
+
   const handleCrechePress = (crecheId: string) => {
-    // Navigate to the detail page with the creche ID
     router.push(`/search/${crecheId}`);
   };
 
   const handleApplyPress = (crecheId: string) => {
-    // Navigate to application form
     router.push(`/apply/${crecheId}`);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
   const renderSearchResult = (result: any) => (
     <Pressable 
       key={result.id} 
       style={styles.resultCard}
-      onPress={() => handleCrechePress(result.id)} // Add onPress handler
+      onPress={() => handleCrechePress(result.id)}
     >
       <Image 
         source={{ uri: result.header_image || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }} 
@@ -90,7 +144,7 @@ export default function SearchScreen() {
           <View style={styles.locationContainer}>
             <MapPin size={12} color="#9ca3af" />
             <Text style={styles.location}>
-              {result.suburb || result.province || 'South Africa'} • {result.distance || 'Nearby'}
+              {result.suburb || result.city || result.province || 'South Africa'}
             </Text>
           </View>
         </View>
@@ -115,17 +169,20 @@ export default function SearchScreen() {
                result.price ? `R${result.price}/day` : 'Contact for pricing'}
             </Text>
             <Text style={[styles.availability, { color: '#22c55e' }]}>
-              Accepting Applications
+              {result.accepting_applications ? 'Accepting Applications' : 'Waitlist Only'}
             </Text>
           </View>
           <Pressable 
-            style={styles.applyButton}
+            style={[styles.applyButton, !result.accepting_applications && styles.disabledButton]}
             onPress={(e) => {
               e.stopPropagation();
               handleApplyPress(result.id);
             }}
+            disabled={!result.accepting_applications}
           >
-            <Text style={styles.applyButtonText}>Apply Now</Text>
+            <Text style={styles.applyButtonText}>
+              {result.accepting_applications ? 'Apply Now' : 'Join Waitlist'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -171,35 +228,68 @@ export default function SearchScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={clearSearch} style={styles.clearButton}>
+              <X size={16} color="#9ca3af" />
+            </Pressable>
+          )}
         </View>
         
-        <Pressable style={styles.filterButton}>
-          <SlidersHorizontal size={20} color="#bd4ab5" />
+        <Pressable 
+          style={[styles.filterButton, showFilters && styles.activeFilterButton]}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <SlidersHorizontal size={20} color={showFilters ? "#ffffff" : "#bd4ab5"} />
         </Pressable>
       </View>
 
       {/* Quick Filters */}
-      <View style={styles.filtersWrapper}>
+      <View style={[styles.filtersWrapper, showFilters && styles.expandedFilters]}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false} 
           style={styles.filtersContainer}
           contentContainerStyle={styles.filtersContentContainer}
         >
-          <Pressable style={[styles.filterChip, styles.activeFilter]}>
-            <Text style={[styles.filterText, styles.activeFilterText]}>All</Text>
+          <Pressable 
+            style={[styles.filterChip, activeFilter === 'all' && styles.activeFilter]}
+            onPress={() => setActiveFilter('all')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'all' && styles.activeFilterText]}>
+              All
+            </Text>
           </Pressable>
-          <Pressable style={styles.filterChip}>
-            <Text style={styles.filterText}>Nearby</Text>
+          <Pressable 
+            style={[styles.filterChip, activeFilter === 'nearby' && styles.activeFilter]}
+            onPress={() => setActiveFilter('nearby')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'nearby' && styles.activeFilterText]}>
+              Nearby
+            </Text>
           </Pressable>
-          <Pressable style={styles.filterChip}>
-            <Text style={styles.filterText}>Verified</Text>
+          <Pressable 
+            style={[styles.filterChip, activeFilter === 'verified' && styles.activeFilter]}
+            onPress={() => setActiveFilter('verified')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'verified' && styles.activeFilterText]}>
+              Verified
+            </Text>
           </Pressable>
-          <Pressable style={styles.filterChip}>
-            <Text style={styles.filterText}>Available</Text>
+          <Pressable 
+            style={[styles.filterChip, activeFilter === 'available' && styles.activeFilter]}
+            onPress={() => setActiveFilter('available')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'available' && styles.activeFilterText]}>
+              Available
+            </Text>
           </Pressable>
-          <Pressable style={styles.filterChip}>
-            <Text style={styles.filterText}>Budget</Text>
+          <Pressable 
+            style={[styles.filterChip, activeFilter === 'budget' && styles.activeFilter]}
+            onPress={() => setActiveFilter('budget')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'budget' && styles.activeFilterText]}>
+              Budget
+            </Text>
           </Pressable>
         </ScrollView>
       </View>
@@ -207,7 +297,11 @@ export default function SearchScreen() {
       {/* Results */}
       <ScrollView style={styles.resultsContainer}>
         <View style={styles.resultsHeader}>
-          <Text style={styles.resultsCount}>{creches.length} creches found</Text>
+          <Text style={styles.resultsCount}>
+            {filteredCreches.length} creches found
+            {searchQuery && ` for "${searchQuery}"`}
+            {activeFilter !== 'all' && ` (${activeFilter})`}
+          </Text>
           <Pressable style={styles.sortButton}>
             <Text style={styles.sortText}>Sort by Distance</Text>
             <Filter size={16} color="#bd4ab5" />
@@ -215,14 +309,21 @@ export default function SearchScreen() {
         </View>
         
         <View style={styles.results}>
-          {creches.length > 0 ? (
-            creches.map(renderSearchResult)
+          {filteredCreches.length > 0 ? (
+            filteredCreches.map(renderSearchResult)
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No creches found</Text>
               <Text style={styles.emptyStateSubtext}>
                 Try adjusting your search criteria or check back later.
               </Text>
+              <Pressable style={styles.clearFiltersButton} onPress={() => {
+                setSearchQuery('');
+                setActiveFilter('all');
+                setShowFilters(false);
+              }}>
+                <Text style={styles.clearFiltersText}>Clear all filters</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -281,6 +382,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
   },
+  clearButton: {
+    padding: 4,
+  },
   filterButton: {
     width: 48,
     height: 48,
@@ -291,9 +395,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bd4ab5',
   },
+  activeFilterButton: {
+    backgroundColor: '#bd4ab5',
+  },
   filtersWrapper: {
     backgroundColor: '#ffffff',
     height: 56,
+  },
+  expandedFilters: {
+    height: 72,
   },
   filtersContainer: {
     flexGrow: 0,
@@ -468,51 +578,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
-  applyButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+  disabledButton: {
+    backgroundColor: '#9ca3af',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ef4444',
-    marginBottom: 8,
-  },
-  errorSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#bd4ab5',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-});
+  applyButtonText
