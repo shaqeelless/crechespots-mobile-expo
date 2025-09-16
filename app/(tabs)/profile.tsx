@@ -80,12 +80,10 @@ const ProfileSkeleton = () => (
       </View>
 
       {/* Sign Out Skeleton */}
-<View style={styles.section}>
-    <Pressable style={styles.signOutButton} onPress={handleSignOut}>
-      <LogOut size={20} color="#ef4444" />
-      <Text style={styles.signOutText}>Sign Out</Text>
-    </Pressable>
-  </View>
+      <View style={styles.section}>
+        
+        <View style={[styles.signOutButton, { backgroundColor: '#e5e7eb' }]} />
+      </View>
 
       {/* App Info Skeleton */}
       <View style={styles.section}>
