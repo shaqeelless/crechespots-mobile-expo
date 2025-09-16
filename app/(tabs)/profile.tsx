@@ -16,7 +16,7 @@ import {
   Settings,
   Bell,
   Shield,
-  CircleHelp as HelpCircle,
+  HelpCircle,
   Baby,
   FileText,
   MapPin,
