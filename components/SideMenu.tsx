@@ -8,7 +8,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { User, Settings, CreditCard, CircleHelp as HelpCircle, Shield, LogOut, X, Star, Calendar, MapPin } from 'lucide-react-native';
+import { User, Settings, CreditCard, CircleHelp, Shield, LogOut, X, Star, Calendar, MapPin } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -25,7 +25,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
     { icon: MapPin, label: 'Saved Locations', color: '#f6cc84' },
     { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6' },
     { icon: Settings, label: 'Settings', color: '#f684a3' },
-    { icon: HelpCircle, label: 'Help & Support', color: '#9cdcb8' },
+    { icon: CircleHelp, label: 'Help & Support', color: '#9cdcb8' },
     { icon: Shield, label: 'Safety Center', color: '#84a7f6' },
   ];
 
