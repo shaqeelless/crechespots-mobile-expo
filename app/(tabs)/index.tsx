@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,56 +8,78 @@ import {
   Pressable,
   Image,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
-import { Menu, Bell, MapPin, Star, Clock } from 'lucide-react-native';
+import { Menu, Bell, MapPin, Star, Clock, Users, Phone } from 'lucide-react-native';
 import SideMenu from '@/components/SideMenu';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-const featuredCreches = [
-  {
-    id: 1,
-    name: 'Little Learners Academy',
-    image: 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
-    rating: 4.9,
-    reviews: 127,
-    location: 'Downtown',
-    price: '€45/day',
-    distance: '0.3 km',
-    verified: true,
-  },
-  {
-    id: 2,
-    name: 'Happy Kids Daycare',
-    image: 'https://images.pexels.com/photos/8613074/pexels-photo-8613074.jpeg',
-    rating: 4.8,
-    reviews: 89,
-    location: 'City Center',
-    price: '€40/day',
-    distance: '0.8 km',
-    verified: true,
-  },
-  {
-    id: 3,
-    name: 'Bright Beginnings',
-    image: 'https://images.pexels.com/photos/8535231/pexels-photo-8535231.jpeg',
-    rating: 4.7,
-    reviews: 64,
-    location: 'Suburbs',
-    price: '€35/day',
-    distance: '1.2 km',
-    verified: true,
-  },
-];
+interface Creche {
+  id: string;
+  name: string;
+  header_image: string;
+  suburb: string;
+  city: string;
+  province: string;
+  monthly_price: number;
+  weekly_price: number;
+  price: number;
+  capacity: number;
+  registered: boolean;
+  accepting_applications: boolean;
+}
+import { AuthProvider } from '@/providers/AuthProvider';
 
 export default function HomeScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [creches, setCreches] = useState<Creche[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { profile } = useAuth();
+  const router = useRouter();
 
-  const renderCrecheCard = (creche: any) => (
-    <Pressable key={creche.id} style={styles.crecheCard}>
-      <Image source={{ uri: creche.image }} style={styles.crecheImage} />
+  useEffect(() => {
+    fetchNearbyCreches();
+  }, []);
+
+  const fetchNearbyCreches = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('creches')
+        .select('*')
+        .eq('accepting_applications', true)
+        .order('name')
+        .limit(10);
+
+      if (error) throw error;
+      setCreches(data || []);
+    } catch (error) {
+      console.error('Error fetching creches:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNearbyCreches();
+  };
+
+  const renderCrecheCard = (creche: Creche) => (
+    <Pressable 
+      key={creche.id} 
+      style={styles.crecheCard}
+      onPress={() => router.push(`/search/${creche.id}`)}
+    >
+      <Image source={{ uri: creche.header_image || 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg' }} style={styles.crecheImage} />
       
-      {creche.verified && (
+      {creche.registered && (
         <View style={styles.verifiedBadge}>
           <Text style={styles.verifiedText}>✓</Text>
         </View>
@@ -68,24 +91,34 @@ export default function HomeScreen() {
         <View style={styles.crecheInfo}>
           <View style={styles.ratingContainer}>
             <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.rating}>{creche.rating}</Text>
-            <Text style={styles.reviews}>({creche.reviews})</Text>
+            <Text style={styles.rating}>4.8</Text>
+            <Text style={styles.reviews}>(124)</Text>
           </View>
           
           <View style={styles.locationContainer}>
             <MapPin size={12} color="#9ca3af" />
-            <Text style={styles.location}>{creche.location} • {creche.distance}</Text>
+            <Text style={styles.location}>
+              {creche.suburb}, {creche.city}
+            </Text>
           </View>
         </View>
         
-        <Text style={styles.price}>{creche.price}</Text>
+        <Text style={styles.price}>
+          {creche.monthly_price ? `R${creche.monthly_price}/month` : creche.weekly_price ? `R${creche.weekly_price}/week` : creche.price ? `R${creche.price}/day` : 'Contact for pricing'}
+        </Text>
       </View>
     </Pressable>
   );
 
   return (
+    <AuthProvider>
     <>
-      <ScrollView style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -123,70 +156,88 @@ export default function HomeScreen() {
             </Pressable>
           </View>
           
-          <Text style={styles.welcomeText}>Find trusted childcare near you</Text>
-          <Text style={styles.locationText}>📍 Dublin, Ireland</Text>
+          <Text style={styles.welcomeText}>
+            Welcome back{profile?.first_name ? `, ${profile.first_name}` : ''}!
+          </Text>
+          <Text style={styles.locationText}>
+            📍 {profile ? 
+              [profile.suburb, profile.city, profile.province].filter(Boolean).join(', ') || 'Update your location in profile'
+              : 'Loading location...'
+            }
+          </Text>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <Pressable style={[styles.actionButton, { backgroundColor: '#f68484' }]}>
             <Text style={styles.actionEmoji}>🔍</Text>
-            <Text style={styles.actionText}>Find Care</Text>
+            <Text style={styles.actionText}>Find Creches</Text>
           </Pressable>
           
-          <Pressable style={[styles.actionButton, { backgroundColor: '#9cdcb8' }]}>
-            <Text style={styles.actionEmoji}>📅</Text>
-            <Text style={styles.actionText}>My Bookings</Text>
+          <Pressable 
+            style={[styles.actionButton, { backgroundColor: '#9cdcb8' }]}
+            onPress={() => router.push('/children')}
+          >
+            <Text style={styles.actionEmoji}>👶</Text>
+            <Text style={styles.actionText}>My Children</Text>
           </Pressable>
           
-          <Pressable style={[styles.actionButton, { backgroundColor: '#84a7f6' }]}>
-            <Text style={styles.actionEmoji}>⭐</Text>
-            <Text style={styles.actionText}>Reviews</Text>
+          <Pressable 
+            style={[styles.actionButton, { backgroundColor: '#84a7f6' }]}
+            onPress={() => router.push('/applications')}
+          >
+            <Text style={styles.actionEmoji}>📋</Text>
+            <Text style={styles.actionText}>Applications</Text>
           </Pressable>
-          
           
           <Pressable style={[styles.actionButton, { backgroundColor: '#f6cc84' }]}>
-            <Text style={styles.actionEmoji}>💬</Text>
-            <Text style={styles.actionText}>Messages</Text>
+            <Text style={styles.actionEmoji}>📰</Text>
+            <Text style={styles.actionText}>Feeds</Text>
           </Pressable>
         </View>
 
-        {/* Featured Section */}
+        {/* Nearby Creches Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Featured Creches</Text>
-          <Text style={styles.sectionSubtitle}>Highly rated childcare near you</Text>
+          <Text style={styles.sectionTitle}>Nearby Creches</Text>
+          <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
           
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.crechesContainer}>
-              {featuredCreches.map(renderCrecheCard)}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading creches...</Text>
             </View>
-          </ScrollView>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.crechesContainer}>
+                {creches.map(renderCrecheCard)}
+              </View>
+            </ScrollView>
+          )}
         </View>
 
-        {/* Recent Activity */}
+        {/* Application Status */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Text style={styles.sectionTitle}>Application Status</Text>
           
           <View style={styles.activityItem}>
-            <View style={[styles.activityIcon, { backgroundColor: '#9cdcb8' }]}>
+            <View style={[styles.activityIcon, { backgroundColor: '#f59e0b' }]}>
               <Clock size={16} color="#ffffff" />
             </View>
             <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Booking Confirmed</Text>
+              <Text style={styles.activityTitle}>Under Review</Text>
               <Text style={styles.activityDescription}>
-                Little Learners Academy - Tomorrow at 8:00 AM
+                2 applications are currently being reviewed by creches
               </Text>
             </View>
           </View>
           
           <View style={styles.activityItem}>
-            <View style={[styles.activityIcon, { backgroundColor: '#84a7f6' }]}>
-              <Star size={16} color="#ffffff" />
+            <View style={[styles.activityIcon, { backgroundColor: '#22c55e' }]}>
+              <Users size={16} color="#ffffff" />
             </View>
             <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Review Reminder</Text>
+              <Text style={styles.activityTitle}>Application Accepted</Text>
               <Text style={styles.activityDescription}>
-                How was your experience at Happy Kids Daycare?
+                Sunshine Daycare accepted your application for Emma
               </Text>
             </View>
           </View>
@@ -198,6 +249,7 @@ export default function HomeScreen() {
         onClose={() => setSideMenuVisible(false)} 
       />
     </>
+    </AuthProvider>
   );
 }
 
@@ -269,6 +321,13 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 14,
+    color: '#6b7280',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
     color: '#6b7280',
   },
   quickActions: {

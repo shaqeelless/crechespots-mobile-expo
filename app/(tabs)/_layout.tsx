@@ -50,11 +50,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="feeds"
         options={{
-          title: 'Messages',
+          title: 'Feeds',
           tabBarIcon: ({ size, color }) => (
-            <MessageCircle size={size} color={color} />
+            <BookOpen size={size} color={color} />
           ),
         }}
       />
