@@ -9,7 +9,8 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Baby, Shield, Clock }import { ArrowRight, Baby, Shield, Clock, User, Mail, Phone, Camera, SkipBack as Skip } from 'lucide-react-native'a = [
+import { ArrowRight, Baby, Shield, Clock, User, Mail, Phone, Camera, SkipBack as Skip } from 'lucide-react-native';
+  a = [
   {
     id: 1,
     title: 'Find Trusted Childcare',
