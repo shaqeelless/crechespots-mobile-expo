@@ -80,7 +80,7 @@ export default function SearchScreen() {
         filtered = filtered.filter(creche => creche.registered === true);
         break;
       case 'available':
-        filtered = filtered.filter(creche => creche.accepting_applications === true);
+        filtered = filtered.filter(creche => creche.applications === true);
         break;
       case 'budget':
         // Filter for creches with monthly price under R2000
