@@ -51,24 +51,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+  const fetchProfile = async (userId: string) => {
+    try {
+      console.log('[AuthProvider] Fetching profile for user:', userId);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+      if (error) {
+        console.error('[AuthProvider] Error fetching profile:', error);
+        setProfile(null);
       } else {
+        console.log('[AuthProvider] Profile fetched successfully');
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('[AuthProvider] Error in fetchProfile:', error);
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('[AuthProvider] Initializing auth...');
+    
+    const getSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[AuthProvider] Session error:', error);
+          setLoading(false);
+          return;
+        }
+
+        console.log('[AuthProvider] Session retrieved:', session ? 'yes' : 'no');
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('[AuthProvider] Error in getSession:', error);
         setLoading(false);
       }
     };
 
     getSession();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AuthProvider] Auth state changed:', event);
+      
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -85,26 +124,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('users') // ✅ your custom table
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('[AuthProvider] Error fetching profile:', error);
-      } else {
-        setProfile(data);
-      }
-    } catch (error) {
-      console.error('[AuthProvider] Error in fetchProfile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id);
@@ -115,6 +134,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      console.log('[AuthProvider] User signed out successfully');
     } catch (error) {
       console.error('[AuthProvider] Error signing out:', error);
       throw error;
