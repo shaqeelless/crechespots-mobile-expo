@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, User, Phone, Mail, MessageCircle, Baby, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth } from '@/context/AuthContext';
 
 interface Child {
   id: string;

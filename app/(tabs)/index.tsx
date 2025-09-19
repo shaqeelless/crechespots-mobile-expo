@@ -32,7 +32,7 @@ interface Creche {
   registered: boolean;
   accepting_applications: boolean;
 }
-import { AuthProvider } from '@/providers/AuthProvider';
+import { AuthProvider } from '@/context/AuthContext';
 
 export default function HomeScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
