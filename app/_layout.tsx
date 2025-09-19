@@ -1,15 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { AuthProvider, useAuth } from '@/context/AuthContext'; // ✅ adjust path
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 function LayoutContent() {
   useFrameworkReady();
   const { user, loading } = useAuth();
 
-  // 🔁 Show splash while checking auth state
   if (loading) {
-    return null; // or <SplashScreen /> if you have one
+    return null; // Optionally, show a loading screen or splash
   }
 
   const isAuthenticated = !!user;
@@ -17,8 +16,8 @@ function LayoutContent() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       {isAuthenticated ? (
-        // ✅ Authenticated users
         <>
+          {/* Tabs and authenticated routes */}
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="search/[id]" />
           <Stack.Screen name="apply/[id]" />
@@ -31,8 +30,8 @@ function LayoutContent() {
           <Stack.Screen name="profile/edit" />
         </>
       ) : (
-        // 🚫 Unauthenticated users
         <>
+          {/* Auth screens for unauthenticated users */}
           <Stack.Screen name="(auth)/onboarding" />
           <Stack.Screen name="(auth)/welcome" />
           <Stack.Screen name="(auth)/register" />
