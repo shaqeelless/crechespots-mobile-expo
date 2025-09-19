@@ -1,3 +1,5 @@
+import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -8,37 +10,38 @@ function LayoutContent() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return null; // Optionally, show a loading screen or splash
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
-
-  const isAuthenticated = !!user;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {isAuthenticated ? (
-        <>
-          {/* Tabs and authenticated routes */}
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="search/[id]" />
-          <Stack.Screen name="apply/[id]" />
-          <Stack.Screen name="children/index" />
-          <Stack.Screen name="children/[id]" />
-          <Stack.Screen name="children/add" />
-          <Stack.Screen name="children/invite" />
-          <Stack.Screen name="applications/index" />
-          <Stack.Screen name="applications/history" />
-          <Stack.Screen name="profile/edit" />
-        </>
-      ) : (
-        <>
-          {/* Auth screens for unauthenticated users */}
-          <Stack.Screen name="(auth)/onboarding" />
-          <Stack.Screen name="(auth)/welcome" />
-          <Stack.Screen name="(auth)/register" />
-          <Stack.Screen name="(auth)/login" />
-          <Stack.Screen name="(auth)/provider-register" />
-        </>
-      )}
+      {/* Index screen that handles initial redirect */}
+      <Stack.Screen name="index" />
+      
+      {/* Authenticated routes */}
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="search/[id]" />
+      <Stack.Screen name="apply/[id]" />
+      <Stack.Screen name="children/index" />
+      <Stack.Screen name="children/[id]" />
+      <Stack.Screen name="children/add" />
+      <Stack.Screen name="children/invite" />
+      <Stack.Screen name="applications/index" />
+      <Stack.Screen name="applications/history" />
+      <Stack.Screen name="profile/edit" />
+      
+      {/* Auth screens */}
+      <Stack.Screen name="(auth)/onboarding" />
+      <Stack.Screen name="(auth)/welcome" />
+      <Stack.Screen name="(auth)/register" />
+      <Stack.Screen name="(auth)/login" />
+      <Stack.Screen name="(auth)/provider-register" />
+      
+      {/* Fallback for 404 */}
       <Stack.Screen name="+not-found" />
     </Stack>
   );

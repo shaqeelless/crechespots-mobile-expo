@@ -15,13 +15,8 @@ export default function Index() {
     );
   }
 
-  // If no user, send to auth onboarding or login
-  if (!user) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  // If user is logged in, send to main app / tabs
-  return <Redirect href="/(tabs)" />;
+  // Simple redirect - let the layout handle the conditional rendering
+  return <Redirect href={user ? "/(tabs)" : "/(auth)/onboarding"} />;
 }
 
 const styles = StyleSheet.create({
