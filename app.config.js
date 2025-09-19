@@ -1,7 +1,7 @@
 export default {
   expo: {
-    name: "bolt-expo-nativewind",
-    slug: "bolt-expo-nativewind",
+    name: "Crechespots",
+    slug: "crechespots",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",

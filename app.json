@@ -19,6 +19,10 @@
     "plugins": ["expo-router", "expo-font", "expo-web-browser"],
     "experiments": {
       "typedRoutes": true
+    },
+    "splash": {
+      "image": "./assets/images/SplashScreen.png",
+      "backgroundColor": "#000000"
     }
   }
 }
