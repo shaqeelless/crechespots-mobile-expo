@@ -1,21 +1,47 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Index() {
-  const { user, loading } = useAuth();
+  const { user, loading, error } = useAuth();
+  const [retryCount, setRetryCount] = useState(0);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  useEffect(() => {
+    if (error && retryCount < 2) {
+      // Retry once before redirecting
+      const timer = setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else if (error && retryCount >= 2) {
+      // After 2 retries, redirect to onboarding
+      const redirectTimer = setTimeout(() => {
+        setShouldRedirect(true);
+      }, 500);
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [error, retryCount]);
+
+  // Redirect to onboarding after retries failed
+  if (shouldRedirect) {
+    return <Redirect href="/(auth)/onboarding" />;
+  }
 
   if (loading) {
-    // Show a spinner / loading screen while checking auth status
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
   }
 
-  // Simple redirect - let the layout handle the conditional rendering
+  // If there's an error and we've exhausted retries, or immediate error
+  if (error && retryCount >= 2) {
+    return <Redirect href="/(auth)/onboarding" />;
+  }
+
   return <Redirect href={user ? "/(tabs)" : "/(auth)/onboarding"} />;
 }
 
@@ -24,5 +50,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f4fcfe',
   },
 });
