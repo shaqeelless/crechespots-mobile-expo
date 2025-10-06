@@ -10,11 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Baby, Shield, Clock, User, Mail, Phone, Camera, SkipBack as Skip } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
-
-// Renamed from 'a' to 'onboardingData'
-const onboardingData = [
+  a = [
   {
     id: 1,
     title: 'Find Trusted Childcare',
@@ -76,10 +72,6 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleSkip = () => {
-    router.push('/(auth)/welcome');
-  };
-
   const renderDots = () => {
     return (
       <View style={styles.dotsContainer}>
@@ -127,11 +119,6 @@ export default function OnboardingScreen() {
           </View>
         </View>
         <Text style={styles.logoSubtext}>SPOTS</Text>
-        
-        {/* Skip Button */}
-        <Pressable style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipText}>Skip</Text>
-        </Pressable>
       </View>
 
       {/* Content */}
@@ -176,7 +163,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 40,
-    paddingHorizontal: 20,
   },
   logoContainer: {
     flexDirection: 'row',
@@ -201,18 +187,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     letterSpacing: 2,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    padding: 10,
-  },
-  skipText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    opacity: 0.8,
   },
   content: {
     flex: 1,
