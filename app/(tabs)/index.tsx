@@ -14,7 +14,6 @@ import SideMenu from '@/components/SideMenu';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
-import { AuthProvider } from '@/context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +37,7 @@ export default function HomeScreen() {
   const [creches, setCreches] = useState<Creche[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { profile } = useAuth();
   const router = useRouter();
 
@@ -48,6 +48,7 @@ export default function HomeScreen() {
   const fetchNearbyCreches = async () => {
     try {
       setLoading(true);
+      setError(null);
       const { data, error } = await supabase
         .from('creches')
         .select('*')
@@ -58,6 +59,7 @@ export default function HomeScreen() {
       setCreches(data || []);
     } catch (error) {
       console.error('Error fetching creches:', error);
+      setError('Failed to load creches. Please pull down to refresh.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -120,136 +122,170 @@ export default function HomeScreen() {
   );
 
   return (
-    <AuthProvider>
-      <>
-        <ScrollView
-          style={styles.container}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <Pressable style={styles.menuButton} onPress={() => setSideMenuVisible(true)}>
-                <Menu size={24} color="#374151" />
+    <>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            colors={['#2563eb']}
+            tintColor={'#2563eb'}
+          />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <Pressable style={styles.menuButton} onPress={() => setSideMenuVisible(true)}>
+              <Menu size={24} color="#374151" />
+            </Pressable>
+            
+            <View style={styles.logoContainer}>
+              <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
+                <Text style={styles.letterText}>C</Text>
+              </View>
+              <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
+                <Text style={styles.letterText}>R</Text>
+              </View>
+              <View style={[styles.letterBlock, { backgroundColor: '#9cdcb8' }]}>
+                <Text style={styles.letterText}>E</Text>
+              </View>
+              <View style={[styles.letterBlock, { backgroundColor: '#84a7f6' }]}>
+                <Text style={styles.letterText}>C</Text>
+              </View>
+              <View style={[styles.letterBlock, { backgroundColor: '#f6cc84' }]}>
+                <Text style={styles.letterText}>H</Text>
+              </View>
+              <View style={[styles.letterBlock, { backgroundColor: '#bd84f6' }]}>
+                <Text style={styles.letterText}>E</Text>
+              </View>
+            </View>
+            
+            <Pressable style={styles.notificationButton}>
+              <Bell size={24} color="#374151" />
+              <View style={styles.notificationBadge} />
+            </Pressable>
+          </View>
+          
+          <Text style={styles.welcomeText}>
+            Welcome back{profile?.first_name ? `, ${profile.first_name}` : ''}!
+          </Text>
+          <Text style={styles.locationText}>
+            📍{' '}
+            {profile
+              ? [profile.suburb, profile.city, profile.province].filter(Boolean).join(', ') ||
+                'Update your location in profile'
+              : 'Loading location...'}
+          </Text>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <Pressable 
+            style={[styles.actionButton, { backgroundColor: '#f68484' }]}
+            onPress={() => router.push('/search')}
+          >
+            <Text style={styles.actionEmoji}>🔍</Text>
+            <Text style={styles.actionText}>Find Creches</Text>
+          </Pressable>
+          
+          <Pressable
+            style={[styles.actionButton, { backgroundColor: '#9cdcb8' }]}
+            onPress={() => router.push('/children')}
+          >
+            <Text style={styles.actionEmoji}>👶</Text>
+            <Text style={styles.actionText}>My Children</Text>
+          </Pressable>
+          
+          <Pressable
+            style={[styles.actionButton, { backgroundColor: '#84a7f6' }]}
+            onPress={() => router.push('/applications')}
+          >
+            <Text style={styles.actionEmoji}>📋</Text>
+            <Text style={styles.actionText}>Applications</Text>
+          </Pressable>
+          
+          <Pressable 
+            style={[styles.actionButton, { backgroundColor: '#f6cc84' }]}
+            onPress={() => router.push('/feeds')}
+          >
+            <Text style={styles.actionEmoji}>📰</Text>
+            <Text style={styles.actionText}>Feeds</Text>
+          </Pressable>
+        </View>
+
+        {/* Nearby Creches Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Nearby Creches</Text>
+          <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
+          
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
+                <Text style={styles.retryButtonText}>Retry</Text>
               </Pressable>
-              
-              <View style={styles.logoContainer}>
-                <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-                  <Text style={styles.letterText}>C</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-                  <Text style={styles.letterText}>R</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#9cdcb8' }]}>
-                  <Text style={styles.letterText}>E</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#84a7f6' }]}>
-                  <Text style={styles.letterText}>C</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#f6cc84' }]}>
-                  <Text style={styles.letterText}>H</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#bd84f6' }]}>
-                  <Text style={styles.letterText}>E</Text>
-                </View>
+            </View>
+          ) : loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading creches...</Text>
+            </View>
+          ) : creches.length > 0 ? (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.crechesScrollContent}
+            >
+              <View style={styles.crechesContainer}>
+                {creches.map(renderCrecheCard)}
               </View>
-              
-              <Pressable style={styles.notificationButton}>
-                <Bell size={24} color="#374151" />
-                <View style={styles.notificationBadge} />
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No creches found in your area</Text>
+              <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
               </Pressable>
             </View>
-            
-            <Text style={styles.welcomeText}>
-              Welcome back{profile?.first_name ? `, ${profile.first_name}` : ''}!
-            </Text>
-            <Text style={styles.locationText}>
-              📍{' '}
-              {profile
-                ? [profile.suburb, profile.city, profile.province].filter(Boolean).join(', ') ||
-                  'Update your location in profile'
-                : 'Loading location...'}
-            </Text>
-          </View>
+          )}
+        </View>
 
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            <Pressable style={[styles.actionButton, { backgroundColor: '#f68484' }]}>
-              <Text style={styles.actionEmoji}>🔍</Text>
-              <Text style={styles.actionText}>Find Creches</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: '#9cdcb8' }]}
-              onPress={() => router.push('/children')}
-            >
-              <Text style={styles.actionEmoji}>👶</Text>
-              <Text style={styles.actionText}>My Children</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: '#84a7f6' }]}
-              onPress={() => router.push('/applications')}
-            >
-              <Text style={styles.actionEmoji}>📋</Text>
-              <Text style={styles.actionText}>Applications</Text>
-            </Pressable>
-            
-            <Pressable style={[styles.actionButton, { backgroundColor: '#f6cc84' }]}>
-              <Text style={styles.actionEmoji}>📰</Text>
-              <Text style={styles.actionText}>Feeds</Text>
-            </Pressable>
-          </View>
-
-          {/* Nearby Creches Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Nearby Creches</Text>
-            <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
-            
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading creches...</Text>
-              </View>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.crechesContainer}>{creches.map(renderCrecheCard)}</View>
-              </ScrollView>
-            )}
-          </View>
-
-          {/* Application Status */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Application Status</Text>
-            
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#f59e0b' }]}>
-                <Clock size={16} color="#ffffff" />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Under Review</Text>
-                <Text style={styles.activityDescription}>
-                  2 applications are currently being reviewed by creches
-                </Text>
-              </View>
+        {/* Application Status */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Application Status</Text>
+          
+          <View style={styles.activityItem}>
+            <View style={[styles.activityIcon, { backgroundColor: '#f59e0b' }]}>
+              <Clock size={16} color="#ffffff" />
             </View>
-            
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#22c55e' }]}>
-                <Users size={16} color="#ffffff" />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Application Accepted</Text>
-                <Text style={styles.activityDescription}>
-                  Sunshine Daycare accepted your application for Emma
-                </Text>
-              </View>
+            <View style={styles.activityContent}>
+              <Text style={styles.activityTitle}>Under Review</Text>
+              <Text style={styles.activityDescription}>
+                2 applications are currently being reviewed by creches
+              </Text>
             </View>
           </View>
-        </ScrollView>
+          
+          <View style={styles.activityItem}>
+            <View style={[styles.activityIcon, { backgroundColor: '#22c55e' }]}>
+              <Users size={16} color="#ffffff" />
+            </View>
+            <View style={styles.activityContent}>
+              <Text style={styles.activityTitle}>Application Accepted</Text>
+              <Text style={styles.activityDescription}>
+                Sunshine Daycare accepted your application for Emma
+              </Text>
+            </View>
+          </View>
+        </View>
 
-        <SideMenu visible={sideMenuVisible} onClose={() => setSideMenuVisible(false)} />
-      </>
-    </AuthProvider>
+        {/* Bottom Padding */}
+        <View style={styles.bottomPadding} />
+      </ScrollView>
+
+      <SideMenu visible={sideMenuVisible} onClose={() => setSideMenuVisible(false)} />
+    </>
   );
 }
 
@@ -360,6 +396,9 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 16,
   },
+  crechesScrollContent: {
+    paddingRight: 20,
+  },
   crechesContainer: {
     flexDirection: 'row',
   },
@@ -442,6 +481,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
   },
+  errorContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
   activityItem: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
@@ -469,5 +544,8 @@ const styles = StyleSheet.create({
   activityDescription: {
     color: '#6b7280',
     fontSize: 14,
+  },
+  bottomPadding: {
+    height: 40,
   },
 });
