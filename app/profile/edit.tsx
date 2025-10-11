@@ -13,10 +13,65 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, User, Mail, Phone, MapPin, Save } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.container}>
+      {/* Header Skeleton */}
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonBackButton} />
+        <View style={styles.skeletonHeaderTitle} />
+        <View style={styles.skeletonSaveButton} />
+      </View>
+
+      <ScrollView style={styles.content}>
+        {/* Profile Picture Section Skeleton */}
+        <View style={styles.skeletonProfilePictureSection}>
+          <View style={styles.skeletonAvatar} />
+          <View style={styles.skeletonChangePhotoButton} />
+        </View>
+
+        {/* Basic Information Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          
+          <View style={styles.skeletonInputRow}>
+            <View style={styles.skeletonInputContainer} />
+            <View style={styles.skeletonInputContainer} />
+          </View>
+
+          <View style={styles.skeletonInputContainer} />
+          <View style={styles.skeletonInputContainer} />
+        </View>
+
+        {/* Location Information Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonInputContainer} />
+          <View style={styles.skeletonInputContainer} />
+          <View style={styles.skeletonInputContainer} />
+        </View>
+
+        {/* Bio Section Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonBioContainer} />
+        </View>
+
+        {/* Save Button Skeleton */}
+        <View style={styles.skeletonSubmitSection}>
+          <View style={styles.skeletonSubmitButton} />
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
 export default function EditProfileScreen() {
   const router = useRouter();
   const { profile, updateProfile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -38,6 +93,8 @@ export default function EditProfileScreen() {
         suburb: profile.suburb || '',
         bio: profile.bio || '',
       });
+      // Simulate loading delay for better UX
+      setTimeout(() => setProfileLoading(false), 1000);
     }
   }, [profile]);
 
@@ -80,10 +137,17 @@ export default function EditProfileScreen() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
+  if (profileLoading) {
+    return <SkeletonLoader />;
+  }
+
   if (!profile) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text>Loading...</Text>
+        <Text>Error loading profile</Text>
+        <Pressable style={styles.retryButton} onPress={() => setProfileLoading(true)}>
+          <Text style={styles.retryText}>Try Again</Text>
+        </Pressable>
       </View>
     );
   }
@@ -383,5 +447,102 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  retryButton: {
+    backgroundColor: '#bd4ab5',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  // Skeleton Loading Styles
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: '#ffffff',
+  },
+  skeletonBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonHeaderTitle: {
+    width: 120,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonSaveButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonProfilePictureSection: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  skeletonAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  skeletonChangePhotoButton: {
+    width: 120,
+    height: 32,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 20,
+  },
+  skeletonSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  skeletonSectionTitle: {
+    width: '40%',
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonInputRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 8,
+  },
+  skeletonInputContainer: {
+    flex: 1,
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  skeletonBioContainer: {
+    height: 100,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonSubmitSection: {
+    paddingBottom: 40,
+  },
+  skeletonSubmitButton: {
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
   },
 });
