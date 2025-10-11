@@ -16,6 +16,56 @@ import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.skeletonContainer}>
+      {/* Search Bar Skeleton */}
+      <View style={styles.skeletonSearchContainer}>
+        <View style={styles.skeletonSearchBar} />
+        <View style={styles.skeletonFilterButton} />
+      </View>
+
+      {/* Filters Skeleton */}
+      <View style={styles.skeletonFilters}>
+        {[1, 2, 3, 4, 5].map((item) => (
+          <View key={item} style={styles.skeletonFilterChip} />
+        ))}
+      </View>
+
+      {/* Results Count Skeleton */}
+      <View style={styles.skeletonResultsHeader}>
+        <View style={styles.skeletonResultsCount} />
+        <View style={styles.skeletonSortButton} />
+      </View>
+
+      {/* Result Cards Skeleton */}
+      {[1, 2, 3, 4].map((item) => (
+        <View key={item} style={styles.skeletonResultCard}>
+          <View style={styles.skeletonImage} />
+          <View style={styles.skeletonContent}>
+            <View style={styles.skeletonHeader}>
+              <View style={styles.skeletonTitle} />
+              <View style={styles.skeletonBadge} />
+            </View>
+            <View style={styles.skeletonRating} />
+            <View style={styles.skeletonLocation} />
+            <View style={styles.skeletonTags}>
+              <View style={styles.skeletonTag} />
+              <View style={styles.skeletonTag} />
+              <View style={styles.skeletonTag} />
+            </View>
+            <View style={styles.skeletonFooter}>
+              <View style={styles.skeletonPrice} />
+              <View style={styles.skeletonButton} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [creches, setCreches] = useState([]);
@@ -37,6 +87,9 @@ export default function SearchScreen() {
   const fetchCreches = async () => {
     try {
       setLoading(true);
+      // Simulate loading delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const { data, error } = await supabase
         .from('creches')
         .select('*')
@@ -191,9 +244,13 @@ export default function SearchScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color="#bd4ab5" />
-        <Text style={styles.loadingText}>Loading creches...</Text>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Find Childcare</Text>
+          <Text style={styles.headerSubtitle}>Discover trusted creches near you</Text>
+        </View>
+        <SkeletonLoader />
       </View>
     );
   }
@@ -627,5 +684,153 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+  },
+  clearFiltersButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#bd4ab5',
+    borderRadius: 8,
+  },
+  clearFiltersText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  // Skeleton Loading Styles
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: '#f4fcfe',
+  },
+  skeletonSearchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+    backgroundColor: '#ffffff',
+  },
+  skeletonSearchBar: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonFilterButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonFilters: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+    backgroundColor: '#ffffff',
+  },
+  skeletonFilterChip: {
+    width: 80,
+    height: 32,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 20,
+  },
+  skeletonResultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  skeletonResultsCount: {
+    width: 120,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonSortButton: {
+    width: 100,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonResultCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginBottom: 16,
+    marginHorizontal: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonContent: {
+    padding: 16,
+  },
+  skeletonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  skeletonTitle: {
+    flex: 1,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  skeletonBadge: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonRating: {
+    width: 80,
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonLocation: {
+    width: 120,
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  skeletonTags: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  skeletonTag: {
+    width: 60,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
+  },
+  skeletonFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skeletonPrice: {
+    width: 100,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonButton: {
+    width: 80,
+    height: 32,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
   },
 });

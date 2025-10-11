@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,24 @@ interface SideMenuProps {
 }
 
 export default function SideMenu({ visible, onClose }: SideMenuProps) {
+  const slideAnim = useRef(new Animated.Value(-width)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: -width,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
   const menuItems = [
     { icon: User, label: 'Profile', color: '#f68484' },
     { icon: Calendar, label: 'My Bookings', color: '#9cdcb8' },
@@ -34,20 +52,27 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         
-        <View style={styles.menuContainer}>
+        <Animated.View 
+          style={[
+            styles.menuContainer,
+            {
+              transform: [{ translateX: slideAnim }]
+            }
+          ]}
+        >
           {/* Header */}
           <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Image 
-              source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
-              style={styles.logoImage}
-              resizeMode="contain"
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
+                style={styles.logoImage}
+                resizeMode="contain"
               />
             </View>
             <Pressable style={styles.closeButton} onPress={onClose}>
@@ -90,7 +115,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
             
             <Text style={styles.version}>Version 1.0.0</Text>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -111,6 +136,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingTop: 60,
     paddingBottom: 32,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
   },
   header: {
     flexDirection: 'row',
