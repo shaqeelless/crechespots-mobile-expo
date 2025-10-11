@@ -13,6 +13,57 @@ import { ArrowLeft, Mail, Send, Users } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.container}>
+      {/* Header Skeleton */}
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonBackButton} />
+        <View style={styles.skeletonHeaderTitle} />
+        <View style={styles.skeletonPlaceholder} />
+      </View>
+
+      <ScrollView style={styles.content}>
+        {/* Info Section Skeleton */}
+        <View style={styles.skeletonInfoSection}>
+          <View style={styles.skeletonIconContainer} />
+          <View style={styles.skeletonInfoTitle} />
+          <View style={styles.skeletonDescription}>
+            <View style={styles.skeletonDescriptionLine} />
+            <View style={styles.skeletonDescriptionLine} />
+            <View style={styles.skeletonDescriptionLineShort} />
+          </View>
+        </View>
+
+        {/* Form Section Skeleton */}
+        <View style={styles.skeletonForm}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonInputContainer} />
+          <View style={styles.skeletonMessageContainer}>
+            <View style={styles.skeletonMessageLabel} />
+            <View style={styles.skeletonMessageInput} />
+          </View>
+        </View>
+
+        {/* Warning Section Skeleton */}
+        <View style={styles.skeletonWarningSection}>
+          <View style={styles.skeletonWarningTitle} />
+          <View style={styles.skeletonWarningText} />
+          <View style={styles.skeletonWarningText} />
+          <View style={styles.skeletonWarningText} />
+          <View style={styles.skeletonWarningText} />
+        </View>
+
+        {/* Submit Button Skeleton */}
+        <View style={styles.skeletonSubmitSection}>
+          <View style={styles.skeletonSubmitButton} />
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
 export default function InviteParentScreen() {
   const router = useRouter();
   const { childId } = useLocalSearchParams();
@@ -20,6 +71,15 @@ export default function InviteParentScreen() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Simulate data loading
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDataLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSendInvite = async () => {
     if (!email) {
@@ -96,6 +156,10 @@ export default function InviteParentScreen() {
       setLoading(false);
     }
   };
+
+  if (dataLoading) {
+    return <SkeletonLoader />;
+  }
 
   return (
     <View style={styles.container}>
@@ -326,5 +390,131 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Skeleton Loading Styles
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: '#ffffff',
+  },
+  skeletonBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonHeaderTitle: {
+    width: 120,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonPlaceholder: {
+    width: 40,
+  },
+  skeletonInfoSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skeletonIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  skeletonInfoTitle: {
+    width: 160,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonDescription: {
+    width: '100%',
+    gap: 8,
+  },
+  skeletonDescriptionLine: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '100%',
+  },
+  skeletonDescriptionLineShort: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '60%',
+  },
+  skeletonForm: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  skeletonSectionTitle: {
+    width: '50%',
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonInputContainer: {
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  skeletonMessageContainer: {
+    marginTop: 8,
+  },
+  skeletonMessageLabel: {
+    width: '40%',
+    height: 18,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonMessageInput: {
+    height: 100,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonWarningSection: {
+    backgroundColor: '#fef3cd',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  skeletonWarningTitle: {
+    width: '40%',
+    height: 18,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  skeletonWarningText: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '90%',
+  },
+  skeletonSubmitSection: {
+    paddingBottom: 40,
+  },
+  skeletonSubmitButton: {
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
   },
 });
