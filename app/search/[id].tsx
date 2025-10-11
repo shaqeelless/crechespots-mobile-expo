@@ -56,6 +56,107 @@ interface Creche {
   whatsapp_number: string;
 }
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.container}>
+      {/* Header Image Skeleton */}
+      <View style={styles.skeletonHeaderImage} />
+      
+      {/* Back Button Skeleton */}
+      <View style={styles.skeletonBackButton} />
+      
+      {/* Share Button Skeleton */}
+      <View style={styles.skeletonShareButton} />
+
+      <ScrollView style={styles.content}>
+        {/* Basic Info Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonTitleRow}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonVerifiedBadge} />
+          </View>
+          <View style={styles.skeletonLocationRow} />
+          <View style={styles.skeletonRatingRow} />
+        </View>
+
+        {/* Pricing Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonPricingRow}>
+            <View style={styles.skeletonPrice} />
+            <View style={styles.skeletonCapacity} />
+          </View>
+        </View>
+
+        {/* Description Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonDescription}>
+            <View style={styles.skeletonDescriptionLine} />
+            <View style={styles.skeletonDescriptionLine} />
+            <View style={styles.skeletonDescriptionLineShort} />
+          </View>
+        </View>
+
+        {/* Operating Hours Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonHoursRow} />
+        </View>
+
+        {/* Facilities Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonTagsContainer}>
+            <View style={styles.skeletonTag} />
+            <View style={styles.skeletonTag} />
+            <View style={styles.skeletonTag} />
+            <View style={styles.skeletonTag} />
+          </View>
+        </View>
+
+        {/* Services Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonTagsContainer}>
+            <View style={styles.skeletonTag} />
+            <View style={styles.skeletonTag} />
+            <View style={styles.skeletonTag} />
+          </View>
+        </View>
+
+        {/* Contact Information Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonContactRows}>
+            <View style={styles.skeletonContactRow} />
+            <View style={styles.skeletonContactRow} />
+            <View style={styles.skeletonContactRow} />
+          </View>
+        </View>
+
+        {/* Social Media Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonSocialRow}>
+            <View style={styles.skeletonSocialButton} />
+            <View style={styles.skeletonSocialButton} />
+            <View style={styles.skeletonSocialButton} />
+          </View>
+        </View>
+
+        {/* Action Buttons Skeleton */}
+        <View style={styles.actionSection}>
+          <View style={styles.skeletonPrimaryButton} />
+          <View style={styles.skeletonSecondaryButton} />
+          <View style={styles.skeletonTertiaryButton} />
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
 export default function CrecheDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -70,6 +171,9 @@ export default function CrecheDetailScreen() {
   const fetchCrecheDetails = async () => {
     try {
       setLoading(true);
+      // Simulate loading delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       const { data, error } = await supabase
         .from('creches')
         .select('*')
@@ -117,12 +221,7 @@ export default function CrecheDetailScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color="#bd4ab5" />
-        <Text style={styles.loadingText}>Loading creche details...</Text>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   if (error || !creche) {
@@ -584,5 +683,152 @@ const styles = StyleSheet.create({
   backText: {
     color: '#374151',
     fontWeight: '600',
+  },
+  // Skeleton Loading Styles
+  skeletonHeaderImage: {
+    width: '100%',
+    height: 250,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonBackButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonShareButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  skeletonTitle: {
+    flex: 1,
+    height: 28,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  skeletonVerifiedBadge: {
+    width: 60,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonLocationRow: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '70%',
+  },
+  skeletonRatingRow: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '40%',
+  },
+  skeletonSectionTitle: {
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 12,
+    width: '30%',
+  },
+  skeletonPricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skeletonPrice: {
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '40%',
+  },
+  skeletonCapacity: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '30%',
+  },
+  skeletonDescription: {
+    gap: 8,
+  },
+  skeletonDescriptionLine: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '100%',
+  },
+  skeletonDescriptionLineShort: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '60%',
+  },
+  skeletonHoursRow: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '50%',
+  },
+  skeletonTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skeletonTag: {
+    width: 80,
+    height: 32,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
+  },
+  skeletonContactRows: {
+    gap: 12,
+  },
+  skeletonContactRow: {
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '70%',
+  },
+  skeletonSocialRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  skeletonSocialButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonPrimaryButton: {
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonSecondaryButton: {
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
+  skeletonTertiaryButton: {
+    height: 52,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
 });
