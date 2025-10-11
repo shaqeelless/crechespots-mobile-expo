@@ -59,6 +59,7 @@ export default function LoginScreen() {
             resizeMode="contain"
           />
         </View>
+      </View>
 
       <View style={styles.content}>
         <Text style={styles.title}>Welcome Back</Text>
@@ -95,8 +96,10 @@ export default function LoginScreen() {
         </View>
 
         {/* Login Button */}
-        <Pressable style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Sign In</Text>
+        <Pressable style={[styles.loginButton, loading && styles.disabledButton]} onPress={handleLogin} disabled={loading}>
+          <Text style={styles.loginButtonText}>
+            {loading ? 'Signing In...' : 'Sign In'}
+          </Text>
         </Pressable>
 
         {/* Register Link */}
@@ -217,6 +220,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 24,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   loginButtonText: {
     color: '#ffffff',
