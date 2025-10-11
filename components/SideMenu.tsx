@@ -119,10 +119,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 32,
   },
-  logoContainer: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
   letterBlock: {
     width: 20,
     height: 20,
@@ -151,9 +147,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-    logoImage: {
+  logoImage: {
     width: 200, // Adjust based on your logo dimensions
     height: 60, // Adjust based on your logo dimensions
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   userInfo: {
     flexDirection: 'row',
