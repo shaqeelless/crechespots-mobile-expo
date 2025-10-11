@@ -7,6 +7,7 @@ import {
   Modal,
   Animated,
   Dimensions,
+  Image,
 } from 'react-native';
 import { User, Settings, CreditCard, CircleHelp, Shield, LogOut, X, Star, Calendar, MapPin } from 'lucide-react-native';
 
@@ -42,30 +43,13 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
         <View style={styles.menuContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <View style={styles.logoContainer}>
-                <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-                  <Text style={styles.letterText}>C</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-                  <Text style={styles.letterText}>R</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#9cdcb8' }]}>
-                  <Text style={styles.letterText}>E</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#84a7f6' }]}>
-                  <Text style={styles.letterText}>C</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#f6cc84' }]}>
-                  <Text style={styles.letterText}>H</Text>
-                </View>
-                <View style={[styles.letterBlock, { backgroundColor: '#bd84f6' }]}>
-                  <Text style={styles.letterText}>E</Text>
-                </View>
-              </View>
-              <Text style={styles.logoSubtext}>SPOTS</Text>
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
+              style={styles.logoImage}
+              resizeMode="contain"
+              />
             </View>
-            
             <Pressable style={styles.closeButton} onPress={onClose}>
               <X size={24} color="#374151" />
             </Pressable>
@@ -166,6 +150,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+    logoImage: {
+    width: 200, // Adjust based on your logo dimensions
+    height: 60, // Adjust based on your logo dimensions
   },
   userInfo: {
     flexDirection: 'row',

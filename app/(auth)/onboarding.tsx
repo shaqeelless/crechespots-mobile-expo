@@ -16,6 +16,9 @@ import { supabase } from '@/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
+// Add your logo image import here
+// import LogoImage from '@/assets/images/logo.png';
+
 const onboardingSteps = [
   {
     id: 1,
@@ -290,29 +293,15 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: currentStep.backgroundColor }]}>
-      {/* Header with Logo */}
+      {/* Header with Logo Image */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-            <Text style={styles.letterText}>C</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-            <Text style={styles.letterText}>R</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#9cdcb8' }]}>
-            <Text style={styles.letterText}>E</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#84a7f6' }]}>
-            <Text style={styles.letterText}>C</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#f6cc84' }]}>
-            <Text style={styles.letterText}>H</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#bd84f6' }]}>
-            <Text style={styles.letterText}>E</Text>
-          </View>
+          <Image 
+            source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
-        <Text style={styles.logoSubtext}>SPOTS</Text>
         
         {/* Skip Button */}
         <Pressable style={styles.skipButton} onPress={handleSkip}>
@@ -369,28 +358,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   logoContainer: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  letterBlock: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 2,
-    opacity: 0.9,
+    marginBottom: 8,
   },
-  letterText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  logoSubtext: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 2,
+  logoImage: {
+    width: 200, // Adjust based on your logo dimensions
+    height: 60, // Adjust based on your logo dimensions
   },
   skipButton: {
     position: 'absolute',
