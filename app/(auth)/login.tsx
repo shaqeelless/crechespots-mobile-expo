@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   StyleSheet,
+  Image,
   Pressable,
   ScrollView,
   Alert,
@@ -52,27 +53,12 @@ export default function LoginScreen() {
         </Pressable>
         
         <View style={styles.logoContainer}>
-          <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-            <Text style={styles.letterText}>C</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#f68484' }]}>
-            <Text style={styles.letterText}>R</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#9cdcb8' }]}>
-            <Text style={styles.letterText}>E</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#84a7f6' }]}>
-            <Text style={styles.letterText}>C</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#f6cc84' }]}>
-            <Text style={styles.letterText}>H</Text>
-          </View>
-          <View style={[styles.letterBlock, { backgroundColor: '#bd84f6' }]}>
-            <Text style={styles.letterText}>E</Text>
-          </View>
+          <Image 
+            source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
-        <Text style={styles.logoSubtext}>SPOTS</Text>
-      </View>
 
       <View style={styles.content}>
         <Text style={styles.title}>Welcome Back</Text>
@@ -152,8 +138,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  logoImage: {
+    width: 200, // Adjust based on your logo dimensions
+    height: 60, // Adjust based on your logo dimensions
+  },
   logoContainer: {
-    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
   letterBlock: {
