@@ -11,6 +11,7 @@ import {
 import { BookOpen, Heart, MessageCircle, Share2, Clock, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'expo-router'; // Added import
 
 interface Article {
   id: string;
@@ -24,7 +25,7 @@ interface Article {
     name: string;
     logo: string;
     suburb: string;
-    province?: string; // Changed from city to province
+    province?: string;
   };
 }
 
@@ -33,6 +34,7 @@ export default function FeedsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
+  const router = useRouter(); // Added router
 
   useEffect(() => {
     fetchFeedArticles();
@@ -69,7 +71,7 @@ export default function FeedsScreen() {
           created_at,
           hearts,
           creche_id,
-          creches(name, logo, suburb, province)  // Changed city to province
+          creches(name, logo, suburb, province)
         `)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -95,14 +97,24 @@ export default function FeedsScreen() {
     fetchFeedArticles();
   };
 
-  const handleLike = async (articleId: string) => {
+  const handleLike = async (articleId: string, e: any) => {
+    e.stopPropagation(); // Prevent navigation when liking
     // Implement like functionality
     console.log('Like article:', articleId);
   };
 
-  const handleShare = async (article: Article) => {
+  const handleShare = async (article: Article, e: any) => {
+    e.stopPropagation(); // Prevent navigation when sharing
     // Implement share functionality
     console.log('Share article:', article.title);
+  };
+
+  const handleArticlePress = (articleId: string) => {
+    router.push(`/article/${articleId}`);
+  };
+
+  const handleExplorePress = () => {
+    router.push('/search'); // Navigate to search screen
   };
 
   const getCategoryColor = (type: string) => {
@@ -115,6 +127,8 @@ export default function FeedsScreen() {
       'safety': '#f684a3',
       'update': '#9cdcb8',
       'article': '#84a7f6',
+      'helpful': '#84a7f6', // Added for your schema
+      'donation': '#f68484', // Added for your schema
     };
     return colors[type?.toLowerCase()] || '#2563eb';
   };
@@ -147,7 +161,11 @@ export default function FeedsScreen() {
   };
 
   const renderArticle = (article: Article) => (
-    <View key={article.id} style={styles.articleCard}>
+    <Pressable 
+      key={article.id} 
+      style={styles.articleCard}
+      onPress={() => handleArticlePress(article.id)}
+    >
       {/* Article Header */}
       <View style={styles.articleHeader}>
         <Image 
@@ -188,7 +206,7 @@ export default function FeedsScreen() {
       <View style={styles.engagementRow}>
         <Pressable
           style={styles.engagementButton}
-          onPress={() => handleLike(article.id)}
+          onPress={(e) => handleLike(article.id, e)}
         >
           <Heart size={18} color="#ef4444" />
           <Text style={styles.engagementText}>{article.hearts || 0}</Text>
@@ -196,13 +214,13 @@ export default function FeedsScreen() {
 
         <Pressable
           style={styles.engagementButton}
-          onPress={() => handleShare(article)}
+          onPress={(e) => handleShare(article, e)}
         >
           <Share2 size={18} color="#6b7280" />
           <Text style={styles.engagementText}>Share</Text>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 
   return (
@@ -236,7 +254,10 @@ export default function FeedsScreen() {
             <Text style={styles.emptyDescription}>
               Start favoriting creches to see their latest updates and articles here
             </Text>
-            <Pressable style={styles.exploreButton}>
+            <Pressable 
+              style={styles.exploreButton}
+              onPress={handleExplorePress}
+            >
               <Text style={styles.exploreButtonText}>Explore Creches</Text>
             </Pressable>
           </View>
