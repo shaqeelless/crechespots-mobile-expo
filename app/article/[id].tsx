@@ -218,7 +218,7 @@ export default function ArticleDetailScreen() {
   };
 
   const handleViewLikes = () => {
-    router.push(`/feeds/${id}/likes`);
+    router.push(`/article/${id}/likes`);
   };
 
   const getCategoryColor = (type: string) => {
