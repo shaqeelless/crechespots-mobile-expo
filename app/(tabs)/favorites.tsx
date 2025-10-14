@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,82 +6,234 @@ import {
   ScrollView,
   Pressable,
   Image,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Heart, Star, MapPin } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'expo-router';
 
-const favoriteCreches = [
-  {
-    id: 1,
-    name: 'Little Learners Academy',
-    image: 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
-    rating: 4.9,
-    reviews: 127,
-    location: 'Downtown',
-    price: '€45/day',
-    savedDate: '2 days ago',
-  },
-  {
-    id: 2,
-    name: 'Sunshine Daycare',
-    image: 'https://images.pexels.com/photos/8535334/pexels-photo-8535334.jpeg',
-    rating: 4.8,
-    reviews: 92,
-    location: 'Northside',
-    price: '€42/day',
-    savedDate: '1 week ago',
-  },
-];
+interface FavoriteCreche {
+  id: string;
+  creche_id: string;
+  created_at: string;
+  creches: {
+    id: string;
+    name: string;
+    header_image: string;
+    suburb: string;
+    city: string;
+    province: string;
+    monthly_price: number;
+    weekly_price: number;
+    price: number;
+    capacity: number;
+    registered: boolean;
+  };
+}
 
 export default function FavoritesScreen() {
+  const [favorites, setFavorites] = useState<FavoriteCreche[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user) {
+      fetchFavorites();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
+
+  const fetchFavorites = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_favorites')
+        .select(`
+          id,
+          creche_id,
+          created_at,
+          creches (
+            id,
+            name,
+            header_image,
+            suburb,
+            city,
+            province,
+            monthly_price,
+            weekly_price,
+            price,
+            capacity,
+            registered
+          )
+        `)
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setFavorites(data || []);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchFavorites();
+  };
+
+  const removeFavorite = async (favoriteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_favorites')
+        .delete()
+        .eq('id', favoriteId);
+
+      if (error) throw error;
+
+      setFavorites(favorites.filter(f => f.id !== favoriteId));
+    } catch (error) {
+      console.error('Error removing favorite:', error);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays === 0) return 'Today';
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Favorites</Text>
+          <Text style={styles.headerSubtitle}>Your saved childcare options</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <Heart size={64} color="#d1d5db" />
+          <Text style={styles.emptyTitle}>Please log in</Text>
+          <Text style={styles.emptyDescription}>
+            Log in to view your favorite creches
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Favorites</Text>
         <Text style={styles.headerSubtitle}>Your saved childcare options</Text>
       </View>
 
-      <ScrollView style={styles.content}>
-        {favoriteCreches.map((creche) => (
-          <View key={creche.id} style={styles.favoriteCard}>
-            <Image source={{ uri: creche.image }} style={styles.favoriteImage} />
-            
-            <View style={styles.favoriteContent}>
-              <View style={styles.favoriteHeader}>
-                <Text style={styles.favoriteName}>{creche.name}</Text>
-                <Pressable style={styles.heartButton}>
-                  <Heart size={20} color="#ef4444" fill="#ef4444" />
-                </Pressable>
-              </View>
-              
-              <View style={styles.favoriteInfo}>
-                <View style={styles.ratingContainer}>
-                  <Star size={14} color="#fbbf24" fill="#fbbf24" />
-                  <Text style={styles.rating}>{creche.rating}</Text>
-                  <Text style={styles.reviews}>({creche.reviews})</Text>
-                </View>
-                
-                <View style={styles.locationContainer}>
-                  <MapPin size={12} color="#9ca3af" />
-                  <Text style={styles.location}>{creche.location}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.favoriteFooter}>
-                <Text style={styles.price}>{creche.price}</Text>
-                <Text style={styles.savedDate}>Saved {creche.savedDate}</Text>
-              </View>
-            </View>
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2563eb']}
+            tintColor={'#2563eb'}
+          />
+        }
+      >
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={styles.loadingText}>Loading your favorites...</Text>
           </View>
-        ))}
-        
-        {favoriteCreches.length === 0 && (
+        ) : favorites.length > 0 ? (
+          favorites.map((favorite) => (
+            <Pressable
+              key={favorite.id}
+              style={styles.favoriteCard}
+              onPress={() => router.push(`/search/${favorite.creche_id}`)}
+            >
+              <Image
+                source={{
+                  uri: favorite.creches?.header_image || 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg'
+                }}
+                style={styles.favoriteImage}
+              />
+
+              {favorite.creches?.registered && (
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedText}>✓</Text>
+                </View>
+              )}
+
+              <View style={styles.favoriteContent}>
+                <View style={styles.favoriteHeader}>
+                  <Text style={styles.favoriteName}>{favorite.creches?.name}</Text>
+                  <Pressable
+                    style={styles.heartButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      removeFavorite(favorite.id);
+                    }}
+                  >
+                    <Heart size={20} color="#ef4444" fill="#ef4444" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.favoriteInfo}>
+                  <View style={styles.ratingContainer}>
+                    <Star size={14} color="#fbbf24" fill="#fbbf24" />
+                    <Text style={styles.rating}>4.8</Text>
+                    <Text style={styles.reviews}>(124)</Text>
+                  </View>
+
+                  <View style={styles.locationContainer}>
+                    <MapPin size={12} color="#9ca3af" />
+                    <Text style={styles.location}>
+                      {favorite.creches?.suburb}, {favorite.creches?.city}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.favoriteFooter}>
+                  <Text style={styles.price}>
+                    {favorite.creches?.monthly_price
+                      ? `R${favorite.creches.monthly_price}/month`
+                      : favorite.creches?.weekly_price
+                      ? `R${favorite.creches.weekly_price}/week`
+                      : favorite.creches?.price
+                      ? `R${favorite.creches.price}/day`
+                      : 'Contact for pricing'}
+                  </Text>
+                  <Text style={styles.savedDate}>Saved {formatTimeAgo(favorite.created_at)}</Text>
+                </View>
+              </View>
+            </Pressable>
+          ))
+        ) : (
           <View style={styles.emptyState}>
             <Heart size={64} color="#d1d5db" />
             <Text style={styles.emptyTitle}>No favorites yet</Text>
             <Text style={styles.emptyDescription}>
               Start exploring and save your favorite creches to see them here
             </Text>
+            <Pressable
+              style={styles.exploreButton}
+              onPress={() => router.push('/search')}
+            >
+              <Text style={styles.exploreButtonText}>Explore Creches</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -115,6 +267,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 12,
+  },
   favoriteCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -130,6 +291,22 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 160,
     backgroundColor: '#e5e7eb',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#22c55e',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   favoriteContent: {
     padding: 16,
@@ -190,7 +367,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#bd4ab5',
+    color: '#2563eb',
   },
   savedDate: {
     fontSize: 12,
@@ -212,5 +389,17 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 24,
+  },
+  exploreButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  exploreButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

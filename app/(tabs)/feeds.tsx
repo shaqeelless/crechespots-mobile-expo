@@ -16,17 +16,15 @@ interface Article {
   id: string;
   title: string;
   content: string;
-  category: string;
-  image_url: string;
+  type: string;
   created_at: string;
-  likes_count: number;
-  comments_count: number;
+  hearts: number;
   creche_id: string;
   creches: {
     name: string;
     logo: string;
     suburb: string;
-    city: string;
+    city?: string;
   };
 }
 
@@ -43,28 +41,39 @@ export default function FeedsScreen() {
   const fetchFeedArticles = async () => {
     try {
       setLoading(true);
-      
-      // Get user's favorite creches first
+
+      if (!user) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const { data: favorites, error: favError } = await supabase
         .from('user_favorites')
         .select('creche_id')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
-      if (favError) throw favError;
+      if (favError) {
+        console.error('Error fetching favorites:', favError);
+      }
 
       const favoriteCreches = favorites?.map(f => f.creche_id) || [];
 
-      // If no favorites, get articles from all creches
       let query = supabase
         .from('articles')
         .select(`
-          *,
+          id,
+          title,
+          content,
+          type,
+          created_at,
+          hearts,
+          creche_id,
           creches(name, logo, suburb, city)
         `)
         .order('created_at', { ascending: false })
         .limit(20);
 
-      // If user has favorites, filter by those creches
       if (favoriteCreches.length > 0) {
         query = query.in('creche_id', favoriteCreches);
       }
@@ -96,16 +105,18 @@ export default function FeedsScreen() {
     console.log('Share article:', article.title);
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors = {
+  const getCategoryColor = (type: string) => {
+    const colors: Record<string, string> = {
       'news': '#f68484',
       'events': '#9cdcb8',
       'tips': '#84a7f6',
       'activities': '#f6cc84',
-      'announcements': '#bd84f6',
+      'announcements': '#2563eb',
       'safety': '#f684a3',
+      'update': '#9cdcb8',
+      'article': '#84a7f6',
     };
-    return colors[category.toLowerCase()] || '#bd4ab5';
+    return colors[type?.toLowerCase()] || '#2563eb';
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -129,12 +140,14 @@ export default function FeedsScreen() {
         />
         <View style={styles.headerInfo}>
           <Text style={styles.crecheName}>{article.creches?.name}</Text>
-          <View style={styles.locationRow}>
-            <MapPin size={12} color="#9ca3af" />
-            <Text style={styles.location}>
-              {article.creches?.suburb}, {article.creches?.city}
-            </Text>
-          </View>
+          {article.creches?.suburb && (
+            <View style={styles.locationRow}>
+              <MapPin size={12} color="#9ca3af" />
+              <Text style={styles.location}>
+                {article.creches.suburb}{article.creches?.city ? `, ${article.creches.city}` : ''}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.timeContainer}>
           <Clock size={12} color="#9ca3af" />
@@ -143,9 +156,11 @@ export default function FeedsScreen() {
       </View>
 
       {/* Category Badge */}
-      <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(article.category) }]}>
-        <Text style={styles.categoryText}>{article.category.toUpperCase()}</Text>
-      </View>
+      {article.type && (
+        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(article.type) }]}>
+          <Text style={styles.categoryText}>{article.type.toUpperCase()}</Text>
+        </View>
+      )}
 
       {/* Article Content */}
       <Text style={styles.articleTitle}>{article.title}</Text>
@@ -153,27 +168,17 @@ export default function FeedsScreen() {
         {article.content}
       </Text>
 
-      {/* Article Image */}
-      {article.image_url && (
-        <Image source={{ uri: article.image_url }} style={styles.articleImage} />
-      )}
-
       {/* Engagement Row */}
       <View style={styles.engagementRow}>
-        <Pressable 
+        <Pressable
           style={styles.engagementButton}
           onPress={() => handleLike(article.id)}
         >
           <Heart size={18} color="#ef4444" />
-          <Text style={styles.engagementText}>{article.likes_count || 0}</Text>
+          <Text style={styles.engagementText}>{article.hearts || 0}</Text>
         </Pressable>
 
-        <Pressable style={styles.engagementButton}>
-          <MessageCircle size={18} color="#6b7280" />
-          <Text style={styles.engagementText}>{article.comments_count || 0}</Text>
-        </Pressable>
-
-        <Pressable 
+        <Pressable
           style={styles.engagementButton}
           onPress={() => handleShare(article)}
         >

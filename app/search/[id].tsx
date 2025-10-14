@@ -12,23 +12,25 @@ import {
   Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Globe, 
-  Star, 
-  Clock, 
-  Users, 
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
+  Star,
+  Clock,
+  Users,
   ChevronLeft,
   Share2,
   Facebook,
   Twitter,
   Instagram,
   MessageCircle,
-  Send
+  Send,
+  Heart
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Creche {
   id: string;
@@ -160,13 +162,19 @@ const SkeletonLoader = () => {
 export default function CrecheDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [creche, setCreche] = useState<Creche | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   useEffect(() => {
     fetchCrecheDetails();
-  }, [id]);
+    if (user) {
+      checkIfFavorite();
+    }
+  }, [id, user]);
 
   const fetchCrecheDetails = async () => {
     try {
@@ -217,6 +225,57 @@ export default function CrecheDetailScreen() {
       });
     } catch (error) {
       console.error('Error sharing:', error);
+    }
+  };
+
+  const checkIfFavorite = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_favorites')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('creche_id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      setIsFavorite(!!data);
+    } catch (error) {
+      console.error('Error checking favorite:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!user) {
+      return;
+    }
+
+    try {
+      setFavoriteLoading(true);
+
+      if (isFavorite) {
+        const { error } = await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('creche_id', id);
+
+        if (error) throw error;
+        setIsFavorite(false);
+      } else {
+        const { error } = await supabase
+          .from('user_favorites')
+          .insert({
+            user_id: user.id,
+            creche_id: id,
+          });
+
+        if (error) throw error;
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
@@ -419,8 +478,19 @@ export default function CrecheDetailScreen() {
           <Pressable style={styles.primaryButton} onPress={() => router.push(`/apply/${creche.id}`)}>
             <Text style={styles.primaryButtonText}>Apply Now</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Save to Favorites</Text>
+          <Pressable
+            style={[styles.secondaryButton, isFavorite && styles.favoriteActive]}
+            onPress={toggleFavorite}
+            disabled={favoriteLoading || !user}
+          >
+            <Heart
+              size={20}
+              color={isFavorite ? '#ef4444' : '#374151'}
+              fill={isFavorite ? '#ef4444' : 'transparent'}
+            />
+            <Text style={[styles.secondaryButtonText, isFavorite && styles.favoriteActiveText]}>
+              {isFavorite ? 'Saved to Favorites' : 'Save to Favorites'}
+            </Text>
           </Pressable>
           <Pressable style={styles.tertiaryButton}>
             <Text style={styles.tertiaryButtonText}>Schedule Visit</Text>
@@ -633,11 +703,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
   },
   secondaryButtonText: {
     color: '#374151',
     fontSize: 16,
     fontWeight: '600',
+  },
+  favoriteActive: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  favoriteActiveText: {
+    color: '#ef4444',
   },
   tertiaryButton: {
     backgroundColor: 'transparent',
