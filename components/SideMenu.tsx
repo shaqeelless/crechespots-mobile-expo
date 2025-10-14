@@ -39,7 +39,6 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
   const menuItems = [
     { icon: User, label: 'Profile', color: '#f68484' },
-    { icon: Star, label: 'My Reviews', color: '#84a7f6' },
     { icon: MapPin, label: 'Saved Locations', color: '#f6cc84' },
     { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6' },
     { icon: Settings, label: 'Settings', color: '#f684a3' },
