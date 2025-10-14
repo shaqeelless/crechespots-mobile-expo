@@ -91,25 +91,42 @@ export default function ArticleDetailScreen() {
     }
   };
 
-  const fetchLikes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('article_likes')
-        .select(`
-          id,
-          user_id,
-          created_at,
-          profiles(id, full_name, avatar_url)
-        `)
-        .eq('article_id', id)
-        .order('created_at', { ascending: false });
+const fetchLikes = async () => {
+  try {
+    // First get the likes
+    const { data: likesData, error: likesError } = await supabase
+      .from('article_likes')
+      .select('id, user_id, created_at')
+      .eq('article_id', id)
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setLikes(data || []);
-    } catch (error) {
-      console.error('Error fetching likes:', error);
+    if (likesError) throw likesError;
+
+    // Then get user details for each like
+    if (likesData && likesData.length > 0) {
+      const userIds = likesData.map(like => like.user_id);
+      
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, first_name, last_name, display_name, profile_picture_url')
+        .in('id', userIds);
+
+      if (usersError) throw usersError;
+
+      // Combine the data
+      const combinedLikes = likesData.map(like => ({
+        ...like,
+        users: usersData?.find(user => user.id === like.user_id) || null
+      }));
+
+      setLikes(combinedLikes);
+    } else {
+      setLikes([]);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching likes:', error);
+  }
+};
 
   const checkIfLiked = async () => {
     if (!user) return;
