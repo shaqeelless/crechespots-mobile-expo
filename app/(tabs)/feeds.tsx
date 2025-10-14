@@ -24,7 +24,7 @@ interface Article {
     name: string;
     logo: string;
     suburb: string;
-    city?: string;
+    province?: string; // Changed from city to province
   };
 }
 
@@ -69,7 +69,7 @@ export default function FeedsScreen() {
           created_at,
           hearts,
           creche_id,
-          creches(name, logo, suburb, city)
+          creches(name, logo, suburb, province)  // Changed city to province
         `)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -130,6 +130,22 @@ export default function FeedsScreen() {
     return date.toLocaleDateString();
   };
 
+  // Helper function to get location text
+  const getLocationText = (creche: any) => {
+    if (!creche) return 'Location not available';
+    
+    if (creche.suburb && creche.province) {
+      return `${creche.suburb}, ${creche.province}`;
+    }
+    if (creche.suburb) {
+      return creche.suburb;
+    }
+    if (creche.province) {
+      return creche.province;
+    }
+    return 'Location not specified';
+  };
+
   const renderArticle = (article: Article) => (
     <View key={article.id} style={styles.articleCard}>
       {/* Article Header */}
@@ -140,11 +156,11 @@ export default function FeedsScreen() {
         />
         <View style={styles.headerInfo}>
           <Text style={styles.crecheName}>{article.creches?.name}</Text>
-          {article.creches?.suburb && (
+          {article.creches && (
             <View style={styles.locationRow}>
               <MapPin size={12} color="#9ca3af" />
               <Text style={styles.location}>
-                {article.creches.suburb}{article.creches?.city ? `, ${article.creches.city}` : ''}
+                {getLocationText(article.creches)}
               </Text>
             </View>
           )}
@@ -230,6 +246,7 @@ export default function FeedsScreen() {
   );
 }
 
+// Your styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
