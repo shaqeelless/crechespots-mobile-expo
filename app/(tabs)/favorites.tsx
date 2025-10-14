@@ -23,8 +23,7 @@ interface FavoriteCreche {
     name: string;
     header_image: string;
     suburb: string;
-    city: string;
-    province: string;
+    province: string; // Changed from city to province
     monthly_price: number;
     weekly_price: number;
     price: number;
@@ -48,41 +47,48 @@ export default function FavoritesScreen() {
     }
   }, [user]);
 
-  const fetchFavorites = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('user_favorites')
-        .select(`
-          id,
-          creche_id,
-          created_at,
-          creches (
-            id,
-            name,
-            header_image,
-            suburb,
-            city,
-            province,
-            monthly_price,
-            weekly_price,
-            price,
-            capacity,
-            registered
-          )
-        `)
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+const fetchFavorites = async () => {
+  try {
+    setLoading(true);
+    
+    // First get the favorite IDs
+    const { data: favoritesData, error: favoritesError } = await supabase
+      .from('user_favorites')
+      .select('id, creche_id, created_at')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setFavorites(data || []);
-    } catch (error) {
-      console.error('Error fetching favorites:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    if (favoritesError) throw favoritesError;
+
+    if (favoritesData && favoritesData.length > 0) {
+      // Then get the creche details for each favorite
+      const crecheIds = favoritesData.map(fav => fav.creche_id);
+      
+      const { data: crechesData, error: crechesError } = await supabase
+        .from('creches')
+        .select('*')
+        .in('id', crecheIds);
+
+      if (crechesError) throw crechesError;
+
+      // Combine the data
+      const combinedData = favoritesData.map(fav => ({
+        ...fav,
+        creches: crechesData?.find(c => c.id === fav.creche_id) || null
+      }));
+
+      setFavorites(combinedData);
+    } else {
+      setFavorites([]);
     }
-  };
+    
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -114,6 +120,22 @@ export default function FavoritesScreen() {
     if (diffInDays < 7) return `${diffInDays} days ago`;
     if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
     return date.toLocaleDateString();
+  };
+
+  // Helper function to get location text
+  const getLocationText = (creche: any) => {
+    if (!creche) return 'Location not available';
+    
+    if (creche.suburb && creche.province) {
+      return `${creche.suburb}, ${creche.province}`;
+    }
+    if (creche.suburb) {
+      return creche.suburb;
+    }
+    if (creche.province) {
+      return creche.province;
+    }
+    return 'Location not specified';
   };
 
   if (!user) {
@@ -201,7 +223,7 @@ export default function FavoritesScreen() {
                   <View style={styles.locationContainer}>
                     <MapPin size={12} color="#9ca3af" />
                     <Text style={styles.location}>
-                      {favorite.creches?.suburb}, {favorite.creches?.city}
+                      {getLocationText(favorite.creches)}
                     </Text>
                   </View>
                 </View>
@@ -241,6 +263,7 @@ export default function FavoritesScreen() {
   );
 }
 
+// Your existing styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
