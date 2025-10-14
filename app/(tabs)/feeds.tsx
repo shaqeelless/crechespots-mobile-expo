@@ -51,13 +51,15 @@ interface Article {
   }>;
   article_comments: Array<{
     id: string;
+    article_id: string;
+    user_id: string;
     content: string;
     created_at: string;
-    user_id: string;
-    profiles: {
-      first_name: string;
-      last_name: string;
-      avatar_url?: string;
+    users: {  // Changed from profiles to users
+      id: string;
+      first_name?: string;
+      last_name?: string;
+      profile_picture_url?: string;
     };
   }>;
 }
@@ -213,36 +215,55 @@ export default function FeedsScreen() {
   }, []);
 
   // Load articles for selected creche
-  const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
-    if (!creche) return;
+const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
+  if (!creche) return;
 
-    try {
-      let query = supabase
-        .from('articles')
-        .select(`
-          *,
-          creches(name, logo, suburb, province),
-          article_likes(*),
-          article_comments(*, profiles(first_name, last_name, avatar_url))
-        `)
-        .eq('creche_id', creche.id);
+  try {
+    let query = supabase
+      .from('articles')
+      .select(`
+        *,
+        creches(name, logo, suburb, province),
+        article_likes(*),
+        article_comments(*, users!article_comments_user_id_fkey(
+          id, 
+          first_name, 
+          last_name, 
+          profile_picture_url
+        ))
+      `)
+      .eq('creche_id', creche.id);
 
-      // Apply filters
-      if (postFilter === 'popular') {
-        query = query.order('hearts', { ascending: false });
-      } else {
-        query = query.order('created_at', { ascending: false });
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setArticles(data || []);
-    } catch (error) {
-      console.error('Error loading articles:', error);
-      setArticles([]);
+    // Apply filters
+    if (postFilter === 'popular') {
+      query = query.order('hearts', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
     }
-  }, [postFilter]);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Ensure proper fallbacks for user data
+    const articlesWithFallbacks = (data || []).map((article: any) => ({
+      ...article,
+      article_comments: (article.article_comments || []).map((comment: any) => ({
+        ...comment,
+        users: comment.users || {
+          first_name: 'User',
+          last_name: '',
+          profile_picture_url: 'https://crechespots.co.za/brand.png'
+        }
+      }))
+    }));
+
+    setArticles(articlesWithFallbacks);
+  } catch (error) {
+    console.error('Error loading articles:', error);
+    setArticles([]);
+  }
+}, [postFilter]);
 
   // Load notification count
   const loadNotificationCount = useCallback(async (uid: string) => {
