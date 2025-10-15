@@ -94,7 +94,7 @@ export default function ProfileScreen() {
       color: '#f6cc84',
       onPress: () => router.push('/applications/history'),
     },
-    { icon: CreditCard, label: 'Payment Methods', color: '#f6cc84', onPress: () => {} },
+    { icon: CreditCard, label: 'Billing', color: '#f6cc84', onPress: () => router.push('/billing') },
     { icon: Bell, label: 'Notifications', color: '#bd84f6', onPress: () => {} },
     { icon: Settings, label: 'App Settings', color: '#f684a3', onPress: () => {} },
     { icon: Shield, label: 'Privacy & Safety', color: '#9cdcb8', onPress: () => {} },
