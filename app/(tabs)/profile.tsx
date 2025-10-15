@@ -238,6 +238,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 24,
+
     backgroundColor: '#ffffff',
   },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#374151' },
@@ -246,6 +247,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     marginBottom: 24,
     paddingBottom: 24,
+    borderBottomEndRadius: 150,
   },
   profileHeader: {
     flexDirection: 'row',
