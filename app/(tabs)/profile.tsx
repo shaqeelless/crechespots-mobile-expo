@@ -94,7 +94,7 @@ export default function ProfileScreen() {
       color: '#f6cc84',
       onPress: () => router.push('/applications/history'),
     },
-    { icon: CreditCard, label: 'Billing', color: '#f6cc84', onPress: () => router.push('/billing') },
+    { icon: CreditCard, label: 'Payment Methods', color: '#f6cc84', onPress: () => {} },
     { icon: Bell, label: 'Notifications', color: '#bd84f6', onPress: () => {} },
     { icon: Settings, label: 'App Settings', color: '#f684a3', onPress: () => {} },
     { icon: Shield, label: 'Privacy & Safety', color: '#9cdcb8', onPress: () => {} },
@@ -238,7 +238,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 24,
-
     backgroundColor: '#ffffff',
   },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#374151' },
@@ -247,7 +246,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     marginBottom: 24,
     paddingBottom: 24,
-    borderBottomEndRadius: 150,
   },
   profileHeader: {
     flexDirection: 'row',

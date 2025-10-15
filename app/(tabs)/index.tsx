@@ -284,7 +284,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 24,
-    borderEndEndRadius: 150,
     backgroundColor: '#ffffff',
   },
   headerTop: {
