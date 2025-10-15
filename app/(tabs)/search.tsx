@@ -10,9 +10,10 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Search, MapPin, Star, Filter, SlidersHorizontal, X } from 'lucide-react-native';
+import { Search, MapPin, Star, Filter, SlidersHorizontal, X, Heart, Bookmark } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
 
 const { width } = Dimensions.get('window');
 
@@ -74,11 +75,17 @@ export default function SearchScreen() {
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [favoritesLoading, setFavoritesLoading] = useState<Set<string>>(new Set());
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchCreches();
-  }, []);
+    if (user) {
+      fetchFavorites();
+    }
+  }, [user]);
 
   useEffect(() => {
     filterCreches();
@@ -106,6 +113,83 @@ export default function SearchScreen() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFavorites = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_favorites')
+        .select('creche_id')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const favoriteIds = new Set(data?.map(fav => fav.creche_id) || []);
+      setFavorites(favoriteIds);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
+
+  const toggleFavorite = async (crecheId: string) => {
+    if (!user) {
+      router.push('/(auth)/login');
+      return;
+    }
+
+    // Optimistic update
+    const wasFavorite = favorites.has(crecheId);
+    const newFavorites = new Set(favorites);
+    
+    if (wasFavorite) {
+      newFavorites.delete(crecheId);
+    } else {
+      newFavorites.add(crecheId);
+    }
+    
+    setFavorites(newFavorites);
+    setFavoritesLoading(prev => new Set(prev).add(crecheId));
+
+    try {
+      if (wasFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('creche_id', crecheId);
+
+        if (error) throw error;
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('user_favorites')
+          .insert([{
+            user_id: user.id,
+            creche_id: crecheId,
+          }]);
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      // Revert optimistic update on error
+      const revertedFavorites = new Set(favorites);
+      if (wasFavorite) {
+        revertedFavorites.add(crecheId);
+      } else {
+        revertedFavorites.delete(crecheId);
+      }
+      setFavorites(revertedFavorites);
+    } finally {
+      setFavoritesLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(crecheId);
+        return newSet;
+      });
     }
   };
 
@@ -141,6 +225,10 @@ export default function SearchScreen() {
           creche.monthly_price && creche.monthly_price <= 2000
         );
         break;
+      case 'saved':
+        // Filter for saved/favorited creches
+        filtered = filtered.filter(creche => favorites.has(creche.id));
+        break;
       case 'nearby':
         // For now, just show all since we don't have location data
         // In a real app, you'd filter by distance using geolocation
@@ -165,82 +253,114 @@ export default function SearchScreen() {
     setSearchQuery('');
   };
 
-  const renderSearchResult = (result: any) => (
-    <Pressable 
-      key={result.id} 
-      style={styles.resultCard}
-      onPress={() => handleCrechePress(result.id)}
-    >
-      <Image 
-        source={{ uri: result.header_image || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }} 
-        style={styles.resultImage} 
-        defaultSource={{ uri: 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }}
-      />
-      
-      <View style={styles.resultContent}>
-        <View style={styles.resultHeader}>
-          <Text style={styles.resultName}>{result.name}</Text>
-          {result.registered && (
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>✓</Text>
+  const renderSearchResult = (result: any) => {
+    const isFavorite = favorites.has(result.id);
+    const isFavoriteLoading = favoritesLoading.has(result.id);
+
+    return (
+      <Pressable 
+        key={result.id} 
+        style={styles.resultCard}
+        onPress={() => handleCrechePress(result.id)}
+      >
+        <View style={styles.imageContainer}>
+          <Image 
+            source={{ uri: result.header_image || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }} 
+            style={styles.resultImage} 
+            defaultSource={{ uri: 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }}
+          />
+          
+          {/* Favorite/Save Button */}
+          <Pressable 
+            style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleFavorite(result.id);
+            }}
+            disabled={isFavoriteLoading}
+          >
+            {isFavoriteLoading ? (
+              <ActivityIndicator size={16} color="#ffffff" />
+            ) : isFavorite ? (
+              <Bookmark size={16} color="#ffffff" fill="#ffffff" />
+            ) : (
+              <Bookmark size={16} color="#ffffff" />
+            )}
+          </Pressable>
+
+          {/* Saved Badge */}
+          {isFavorite && !isFavoriteLoading && (
+            <View style={styles.savedBadge}>
+              <Text style={styles.savedBadgeText}>SAVED</Text>
             </View>
           )}
         </View>
         
-        <View style={styles.resultInfo}>
-          <View style={styles.ratingContainer}>
-            <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.rating}>4.9</Text>
-            <Text style={styles.reviews}>(156)</Text>
+        <View style={styles.resultContent}>
+          <View style={styles.resultHeader}>
+            <Text style={styles.resultName}>{result.name}</Text>
+            {result.registered && (
+              <View style={styles.verifiedBadge}>
+                <Text style={styles.verifiedText}>✓</Text>
+              </View>
+            )}
           </View>
           
-          <View style={styles.locationContainer}>
-            <MapPin size={12} color="#9ca3af" />
-            <Text style={styles.location}>
-              {result.suburb || result.city || result.province || 'South Africa'}
-            </Text>
+          <View style={styles.resultInfo}>
+            <View style={styles.ratingContainer}>
+              <Star size={14} color="#fbbf24" fill="#fbbf24" />
+              <Text style={styles.rating}>4.9</Text>
+              <Text style={styles.reviews}>(156)</Text>
+            </View>
+            
+            <View style={styles.locationContainer}>
+              <MapPin size={12} color="#9ca3af" />
+              <Text style={styles.location}>
+                {result.suburb || result.city || result.province || 'South Africa'}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.tagsContainer}>
+            {result.services && Object.entries(result.services).slice(0, 3).map(([service, available], index) => (
+              available && (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>
+                    {service.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </Text>
+                </View>
+              )
+            ))}
+          </View>
+          
+          <View style={styles.resultFooter}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.price}>
+                {result.monthly_price ? `R${result.monthly_price}/month` : 
+                 result.weekly_price ? `R${result.weekly_price}/week` : 
+                 result.price ? `R${result.price}/day` : 'Contact for pricing'}
+              </Text>
+              <Text style={[styles.availability, { color: '#22c55e' }]}>
+                {result.accepting_applications ? 'Accepting Applications' : 'Waitlist Only'}
+              </Text>
+            </View>
+            <Pressable 
+              style={[styles.applyButton, !result.accepting_applications && styles.disabledButton]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleApplyPress(result.id);
+              }}
+              disabled={!result.accepting_applications}
+            >
+              <Text style={styles.applyButtonText}>
+                {result.accepting_applications ? 'Apply Now' : 'Join Waitlist'}
+              </Text>
+            </Pressable>
           </View>
         </View>
-        
-        <View style={styles.tagsContainer}>
-          {result.services && Object.entries(result.services).slice(0, 3).map(([service, available], index) => (
-            available && (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>
-                  {service.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                </Text>
-              </View>
-            )
-          ))}
-        </View>
-        
-        <View style={styles.resultFooter}>
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>
-              {result.monthly_price ? `R${result.monthly_price}/month` : 
-               result.weekly_price ? `R${result.weekly_price}/week` : 
-               result.price ? `R${result.price}/day` : 'Contact for pricing'}
-            </Text>
-            <Text style={[styles.availability, { color: '#22c55e' }]}>
-              {result.accepting_applications ? 'Accepting Applications' : 'Waitlist Only'}
-            </Text>
-          </View>
-          <Pressable 
-            style={[styles.applyButton, !result.accepting_applications && styles.disabledButton]}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleApplyPress(result.id);
-            }}
-            disabled={!result.accepting_applications}
-          >
-            <Text style={styles.applyButtonText}>
-              {result.accepting_applications ? 'Apply Now' : 'Join Waitlist'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </Pressable>
-  );
+      </Pressable>
+    );
+  };
 
   if (loading) {
     return (
@@ -317,6 +437,14 @@ export default function SearchScreen() {
             </Text>
           </Pressable>
           <Pressable 
+            style={[styles.filterChip, activeFilter === 'saved' && styles.activeFilter]}
+            onPress={() => setActiveFilter('saved')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'saved' && styles.activeFilterText]}>
+              Saved
+            </Text>
+          </Pressable>
+          <Pressable 
             style={[styles.filterChip, activeFilter === 'nearby' && styles.activeFilter]}
             onPress={() => setActiveFilter('nearby')}
           >
@@ -372,7 +500,10 @@ export default function SearchScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No creches found</Text>
               <Text style={styles.emptyStateSubtext}>
-                Try adjusting your search criteria or check back later.
+                {activeFilter === 'saved' 
+                  ? "You haven't saved any creches yet. Start exploring and save your favorites!"
+                  : "Try adjusting your search criteria or check back later."
+                }
               </Text>
               <Pressable style={styles.clearFiltersButton} onPress={() => {
                 setSearchQuery('');
@@ -532,10 +663,44 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  imageContainer: {
+    position: 'relative',
+  },
   resultImage: {
     width: '100%',
     height: 180,
     backgroundColor: '#e5e7eb',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  favoriteButtonActive: {
+    backgroundColor: '#bd4ab5',
+  },
+  savedBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#bd4ab5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 2,
+  },
+  savedBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   resultContent: {
     padding: 16,
@@ -684,6 +849,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+    marginBottom: 16,
   },
   clearFiltersButton: {
     marginTop: 16,
@@ -696,7 +862,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  // Skeleton Loading Styles
+  // Skeleton Loading Styles (keep existing skeleton styles)
   skeletonContainer: {
     flex: 1,
     backgroundColor: '#f4fcfe',

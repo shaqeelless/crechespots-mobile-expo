@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
@@ -22,10 +23,15 @@ import {
   X,
   Plus,
   Link,
-  Trash2
+  Trash2,
+  Camera,
+  Upload
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Child {
   id: string;
@@ -35,6 +41,7 @@ interface Child {
   gender: string;
   user_id: string;
   created_at: string;
+  profile_picture_url: string;
   special_needs?: string;
   allergies?: string;
   medical_conditions?: string;
@@ -67,6 +74,12 @@ const SkeletonLoader = () => {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Profile Picture Skeleton */}
+        <View style={styles.skeletonProfileSection}>
+          <View style={styles.skeletonProfileImage} />
+          <View style={styles.skeletonProfileButton} />
+        </View>
+
         {/* Child Info Skeleton */}
         <View style={styles.skeletonSection}>
           <View style={styles.skeletonSectionTitle} />
@@ -107,8 +120,6 @@ export default function ChildDetailsScreen() {
   const params = useLocalSearchParams();
   const { profile } = useAuth();
 
-  // Get the child ID from the URL parameters
-  // In Expo Router, the parameter name matches the file name: [id].tsx -> params.id
   const childId = params.id as string;
 
   const [child, setChild] = useState<Child | null>(null);
@@ -120,6 +131,7 @@ export default function ChildDetailsScreen() {
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -246,6 +258,115 @@ export default function ChildDetailsScreen() {
     } catch (error) {
       console.error('Error in fetchPendingInvitations:', error);
       // Don't set overall error, just log it
+    }
+  };
+
+  const handleImagePick = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Sorry, we need camera roll permissions to upload images.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    if (!child) return;
+
+    try {
+      setUploadingImage(true);
+
+      // Convert image to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Generate unique file name
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${child.id}/${uuidv4()}.${fileExt}`;
+      const filePath = `child-profile-pictures/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('child-images')
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('child-images')
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData.publicUrl;
+
+      // Update child record with new image URL
+      const { error: updateError } = await supabase
+        .from('children')
+        .update({ profile_picture_url: publicUrl })
+        .eq('id', child.id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setChild(prev => prev ? { ...prev, profile_picture_url: publicUrl } : null);
+      
+      Alert.alert('Success', 'Profile picture updated successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeProfilePicture = async () => {
+    if (!child) return;
+
+    try {
+      setUploadingImage(true);
+
+      // Reset to default profile picture
+      const defaultImage = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png';
+      
+      const { error } = await supabase
+        .from('children')
+        .update({ profile_picture_url: defaultImage })
+        .eq('id', child.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setChild(prev => prev ? { ...prev, profile_picture_url: defaultImage } : null);
+      
+      Alert.alert('Success', 'Profile picture removed successfully!');
+    } catch (error) {
+      console.error('Error removing profile picture:', error);
+      Alert.alert('Error', 'Failed to remove profile picture. Please try again.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -391,17 +512,6 @@ export default function ChildDetailsScreen() {
     }
   };
 
-  // Debug information
-  console.log('Current state:', {
-    loading,
-    error,
-    child,
-    childId,
-    hasChild: !!child,
-    linkedParentsCount: linkedParents.length,
-    pendingInvitationsCount: pendingInvitations.length
-  });
-
   if (loading) {
     console.log('Rendering skeleton loader');
     return <SkeletonLoader />;
@@ -438,7 +548,8 @@ export default function ChildDetailsScreen() {
     );
   }
 
-  console.log('Rendering child details for:', child.first_name, child.last_name);
+  const isDefaultImage = child.profile_picture_url?.includes('blank-profile-picture');
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -462,6 +573,43 @@ export default function ChildDetailsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Profile Picture Section */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileImageContainer}>
+            <Image 
+              source={{ uri: child.profile_picture_url }} 
+              style={styles.profileImage}
+              defaultSource={{ uri: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png' }}
+            />
+            <View style={styles.profileImageOverlay}>
+              <Pressable 
+                style={styles.imageActionButton}
+                onPress={handleImagePick}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Camera size={20} color="#ffffff" />
+                )}
+              </Pressable>
+              {!isDefaultImage && (
+                <Pressable 
+                  style={[styles.imageActionButton, styles.removeImageButton]}
+                  onPress={removeProfilePicture}
+                  disabled={uploadingImage}
+                >
+                  <Trash2 size={16} color="#ffffff" />
+                </Pressable>
+              )}
+            </View>
+          </View>
+          
+          <Text style={styles.profileImageText}>
+            {uploadingImage ? 'Uploading...' : 'Tap to change photo'}
+          </Text>
+        </View>
+
         {/* Child Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Child Information</Text>
@@ -748,6 +896,44 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  // Profile Picture Styles
+  profileSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#e5e7eb',
+  },
+  profileImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  imageActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#bd4ab5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageButton: {
+    backgroundColor: '#ef4444',
+  },
+  profileImageText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
   },
   section: {
     backgroundColor: '#ffffff',
@@ -1049,6 +1235,23 @@ const styles = StyleSheet.create({
   },
   skeletonPlaceholder: {
     width: 40,
+  },
+  skeletonProfileSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skeletonProfileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#e5e7eb',
+    marginBottom: 8,
+  },
+  skeletonProfileButton: {
+    width: 100,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 10,
   },
   skeletonSection: {
     backgroundColor: '#ffffff',
