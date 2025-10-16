@@ -13,9 +13,10 @@ import { Pressable, View, Dimensions, Text } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_COUNT = 5;
-const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
+const TAB_BAR_WIDTH = SCREEN_WIDTH - 40; // Account for left/right margins (20 + 20)
+const TAB_WIDTH = TAB_BAR_WIDTH / TAB_COUNT;
 
-// Floating Background Indicator - Fixed z-index
+// Fixed Floating Background Indicator
 const FloatingBackground = ({ activeIndex }) => {
   const translateX = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -30,7 +31,9 @@ const FloatingBackground = ({ activeIndex }) => {
   });
 
   useEffect(() => {
-    translateX.value = withSpring(activeIndex * TAB_WIDTH, {
+    // Calculate the correct position within the tab bar
+    const targetPosition = activeIndex * TAB_WIDTH;
+    translateX.value = withSpring(targetPosition, {
       damping: 15,
       stiffness: 120,
       mass: 0.8,
@@ -47,21 +50,20 @@ const FloatingBackground = ({ activeIndex }) => {
       style={[
         {
           position: 'absolute',
-          top: 8,
-          left: (TAB_WIDTH - 60) / 2,
-          width: 60,
-          height: 32,
+          left: 0, // Start from the left edge of the tab bar
+          width: TAB_WIDTH, // Match individual tab width
+          height: 65,
           backgroundColor: '#bd4ab5',
           borderRadius: 16,
           shadowColor: '#bd4ab5',
           shadowOffset: {
             width: 0,
-            height: 6,
+            height: 10,
           },
           shadowOpacity: 0.3,
           shadowRadius: 12,
           elevation: 6,
-          zIndex: 0, // Ensure background stays behind icons
+          zIndex: 0,
         },
         animatedStyle,
       ]}
@@ -69,7 +71,7 @@ const FloatingBackground = ({ activeIndex }) => {
   );
 };
 
-// Enhanced Floating Tab Icon with proper z-index
+// Enhanced Floating Tab Icon
 const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -82,7 +84,7 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
         { scale: scale.value }
       ],
       opacity: opacity.value,
-      zIndex: 10, // Ensure icon stays above background
+      zIndex: 10,
     };
   });
 
@@ -92,7 +94,7 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
         {
           translateY: interpolate(
             translateY.value,
-            [0, -12],
+            [0, -8],
             [0, -2],
             Extrapolate.CLAMP
           ),
@@ -100,7 +102,7 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
       ],
       opacity: interpolate(
         translateY.value,
-        [0, -12],
+        [0, -8],
         [0.7, 1],
         Extrapolate.CLAMP
       ),
@@ -143,7 +145,7 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10, // Ensure pressable area stays above background
+        zIndex: 10,
       }}
     >
       <Animated.View style={iconAnimatedStyle}>
@@ -167,7 +169,7 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
   );
 };
 
-// Fixed Custom Tab Bar with proper layering
+// Fixed Custom Tab Bar
 const CustomTabBar = ({ state, descriptors, navigation }) => {
   return (
     <View
@@ -176,6 +178,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
         bottom: 20,
         left: 20,
         right: 20,
+        width: TAB_BAR_WIDTH, // Explicit width
         height: 70,
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderRadius: 25,
@@ -193,7 +196,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
         overflow: 'hidden',
       }}
     >
-      {/* Floating Background Indicator - Now properly behind icons */}
+      {/* Fixed Background Indicator */}
       <FloatingBackground activeIndex={state.index} />
       
       {state.routes.map((route, index) => {
@@ -248,7 +251,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   );
 };
 
-// Main Tab Layout with Fixed Custom Tab Bar
+// Main Tab Layout
 export default function TabLayout() {
   return (
     <Tabs
@@ -309,8 +312,8 @@ export default function TabLayout() {
   );
 }
 
-// Alternative: Simpler version with better built-in tab bar styling
-export function CleanFloatingTabLayout() {
+// Debug version to test positioning
+export function DebugTabLayout() {
   return (
     <Tabs
       screenOptions={{
@@ -342,7 +345,7 @@ export function CleanFloatingTabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 10,
+          marginTop: 4,
         },
       }}
     >
@@ -351,9 +354,9 @@ export function CleanFloatingTabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ size, color, focused }) => (
-            <SimpleFloatingIcon focused={focused}>
+            <DebugFloatingIcon focused={focused} index={0}>
               <Home size={size} color={color} />
-            </SimpleFloatingIcon>
+            </DebugFloatingIcon>
           ),
         }}
       />
@@ -362,9 +365,9 @@ export function CleanFloatingTabLayout() {
         options={{
           title: 'Search',
           tabBarIcon: ({ size, color, focused }) => (
-            <SimpleFloatingIcon focused={focused}>
+            <DebugFloatingIcon focused={focused} index={1}>
               <Search size={size} color={color} />
-            </SimpleFloatingIcon>
+            </DebugFloatingIcon>
           ),
         }}
       />
@@ -373,9 +376,9 @@ export function CleanFloatingTabLayout() {
         options={{
           title: 'Favorites',
           tabBarIcon: ({ size, color, focused }) => (
-            <SimpleFloatingIcon focused={focused}>
+            <DebugFloatingIcon focused={focused} index={2}>
               <Heart size={size} color={color} />
-            </SimpleFloatingIcon>
+            </DebugFloatingIcon>
           ),
         }}
       />
@@ -384,9 +387,9 @@ export function CleanFloatingTabLayout() {
         options={{
           title: 'Feeds',
           tabBarIcon: ({ size, color, focused }) => (
-            <SimpleFloatingIcon focused={focused}>
+            <DebugFloatingIcon focused={focused} index={3}>
               <BookOpen size={size} color={color} />
-            </SimpleFloatingIcon>
+            </DebugFloatingIcon>
           ),
         }}
       />
@@ -395,9 +398,9 @@ export function CleanFloatingTabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ size, color, focused }) => (
-            <SimpleFloatingIcon focused={focused}>
+            <DebugFloatingIcon focused={focused} index={4}>
               <User size={size} color={color} />
-            </SimpleFloatingIcon>
+            </DebugFloatingIcon>
           ),
         }}
       />
@@ -405,8 +408,8 @@ export function CleanFloatingTabLayout() {
   );
 }
 
-// Simple floating icon for the clean version
-const SimpleFloatingIcon = ({ focused, children }) => {
+// Debug version with background
+const DebugFloatingIcon = ({ focused, children, index }) => {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
 
@@ -416,6 +419,9 @@ const SimpleFloatingIcon = ({ focused, children }) => {
         { translateY: translateY.value },
         { scale: scale.value }
       ],
+      backgroundColor: focused ? '#bd4ab5' : 'transparent',
+      padding: focused ? 8 : 0,
+      borderRadius: focused ? 20 : 0,
     };
   });
 
