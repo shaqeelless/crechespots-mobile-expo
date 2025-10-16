@@ -10,6 +10,24 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Menu, Bell, MapPin, Star, Clock, Users } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withSequence,
+  withRepeat,
+  interpolate,
+  Extrapolate,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  SlideInRight,
+  ZoomIn,
+  LightSpeedInLeft,
+  BounceIn,
+} from 'react-native-reanimated';
 import SideMenu from '@/components/SideMenu';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +50,270 @@ interface Creche {
   applications: boolean;
 }
 
+// Animated Components
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const AnimatedView = Animated.createAnimatedComponent(View);
+const AnimatedText = Animated.createAnimatedComponent(Text);
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+// Floating Notification Badge
+const FloatingNotificationBadge = () => {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+      opacity: opacity.value,
+    };
+  });
+
+  useEffect(() => {
+    // Pulsing animation for notification badge
+    scale.value = withRepeat(
+      withSequence(
+        withSpring(1, { damping: 2, stiffness: 100 }),
+        withSpring(1.2, { damping: 2, stiffness: 100 }),
+        withSpring(1, { damping: 2, stiffness: 100 })
+      ),
+      -1, // Infinite repeat
+      true // Reverse
+    );
+    opacity.value = withTiming(1, { duration: 500 });
+  }, []);
+
+  return (
+    <Animated.View style={[styles.notificationBadge, animatedStyle]} />
+  );
+};
+
+// Animated Action Button
+const AnimatedActionButton = ({ emoji, text, backgroundColor, delay, onPress }) => {
+  const translateY = useSharedValue(50);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.8);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateY: translateY.value },
+        { scale: scale.value }
+      ],
+      opacity: opacity.value,
+    };
+  });
+
+  const textAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateY: interpolate(
+            translateY.value,
+            [50, 0],
+            [10, 0],
+            Extrapolate.CLAMP
+          ),
+        },
+      ],
+      opacity: interpolate(
+        translateY.value,
+        [50, 0],
+        [0, 1],
+        Extrapolate.CLAMP
+      ),
+    };
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      translateY.value = withSpring(0, {
+        damping: 12,
+        stiffness: 100,
+        mass: 0.8,
+      });
+      opacity.value = withTiming(1, { duration: 600 });
+      scale.value = withSpring(1, {
+        damping: 12,
+        stiffness: 100,
+      });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <AnimatedPressable 
+      style={[styles.actionButton, { backgroundColor }, animatedStyle]}
+      onPress={onPress}
+    >
+      <Animated.Text style={styles.actionEmoji}>{emoji}</Animated.Text>
+      <Animated.Text style={[styles.actionText, textAnimatedStyle]}>
+        {text}
+      </Animated.Text>
+    </AnimatedPressable>
+  );
+};
+
+// Animated Creche Card
+const AnimatedCrecheCard = ({ creche, index, onPress }) => {
+  const translateX = useSharedValue(100);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.9);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { scale: scale.value }
+      ],
+      opacity: opacity.value,
+    };
+  });
+
+  const imageAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          scale: interpolate(
+            scale.value,
+            [0.9, 1],
+            [1, 1.05],
+            Extrapolate.CLAMP
+          ),
+        },
+      ],
+    };
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      translateX.value = withSpring(0, {
+        damping: 15,
+        stiffness: 90,
+        mass: 0.8,
+      });
+      opacity.value = withTiming(1, { duration: 800 });
+      scale.value = withSpring(1, {
+        damping: 15,
+        stiffness: 90,
+      });
+    }, 200 + index * 150);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <AnimatedPressable 
+      style={[styles.crecheCard, animatedStyle]}
+      onPress={onPress}
+    >
+      <Animated.Image
+        source={{
+          uri: creche.header_image || 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
+        }}
+        style={[styles.crecheImage, imageAnimatedStyle]}
+      />
+      
+      {creche.registered && (
+        <AnimatedView 
+          style={styles.verifiedBadge}
+          entering={ZoomIn.delay(500 + index * 150).springify()}
+        >
+          <Text style={styles.verifiedText}>✓</Text>
+        </AnimatedView>
+      )}
+      
+      <View style={styles.crecheContent}>
+        <AnimatedText 
+          style={styles.crecheName}
+          entering={FadeInDown.delay(600 + index * 150).springify()}
+        >
+          {creche.name}
+        </AnimatedText>
+        
+        <View style={styles.crecheInfo}>
+          <View style={styles.ratingContainer}>
+            <Star size={14} color="#fbbf24" fill="#fbbf24" />
+            <AnimatedText 
+              style={styles.rating}
+              entering={FadeIn.delay(700 + index * 150)}
+            >
+              4.8
+            </AnimatedText>
+            <AnimatedText 
+              style={styles.reviews}
+              entering={FadeIn.delay(750 + index * 150)}
+            >
+              (124)
+            </AnimatedText>
+          </View>
+          
+          <View style={styles.locationContainer}>
+            <MapPin size={12} color="#9ca3af" />
+            <AnimatedText 
+              style={styles.location}
+              entering={FadeIn.delay(800 + index * 150)}
+            >
+              {creche.suburb}, {creche.city}
+            </AnimatedText>
+          </View>
+        </View>
+        
+        <AnimatedText 
+          style={styles.price}
+          entering={FadeInUp.delay(850 + index * 150).springify()}
+        >
+          {creche.monthly_price
+            ? `R${creche.monthly_price}/month`
+            : creche.weekly_price
+            ? `R${creche.weekly_price}/week`
+            : creche.price
+            ? `R${creche.price}/day`
+            : 'Contact for pricing'}
+        </AnimatedText>
+      </View>
+    </AnimatedPressable>
+  );
+};
+
+// Animated Activity Item
+const AnimatedActivityItem = ({ icon: Icon, title, description, backgroundColor, delay }) => {
+  const translateX = useSharedValue(-50);
+  const opacity = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+      opacity: opacity.value,
+    };
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      translateX.value = withSpring(0, {
+        damping: 12,
+        stiffness: 100,
+      });
+      opacity.value = withTiming(1, { duration: 600 });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <AnimatedView style={[styles.activityItem, animatedStyle]}>
+      <View style={[styles.activityIcon, { backgroundColor }]}>
+        <Icon size={16} color="#ffffff" />
+      </View>
+      <View style={styles.activityContent}>
+        <Text style={styles.activityTitle}>{title}</Text>
+        <Text style={styles.activityDescription}>{description}</Text>
+      </View>
+    </AnimatedView>
+  );
+};
+
 export default function HomeScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [creches, setCreches] = useState<Creche[]>([]);
@@ -41,9 +323,27 @@ export default function HomeScreen() {
   const { profile } = useAuth();
   const router = useRouter();
 
+  // Header animations
+  const headerScale = useSharedValue(0.8);
+  const headerOpacity = useSharedValue(0);
+
   useEffect(() => {
     fetchNearbyCreches();
+    
+    // Header entrance animation
+    headerScale.value = withSpring(1, {
+      damping: 15,
+      stiffness: 120,
+    });
+    headerOpacity.value = withTiming(1, { duration: 800 });
   }, []);
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: headerScale.value }],
+      opacity: headerOpacity.value,
+    };
+  });
 
   const fetchNearbyCreches = async () => {
     try {
@@ -71,152 +371,130 @@ export default function HomeScreen() {
     fetchNearbyCreches();
   };
 
-  const renderCrecheCard = (creche: Creche) => (
-    <Pressable 
-      key={creche.id} 
-      style={styles.crecheCard}
-      onPress={() => router.push(`/search/${creche.id}`)}
-    >
-      <Image
-        source={{
-          uri: creche.header_image || 'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg',
-        }}
-        style={styles.crecheImage}
-      />
-      
-      {creche.registered && (
-        <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedText}>✓</Text>
-        </View>
-      )}
-      
-      <View style={styles.crecheContent}>
-        <Text style={styles.crecheName}>{creche.name}</Text>
-        
-        <View style={styles.crecheInfo}>
-          <View style={styles.ratingContainer}>
-            <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.rating}>4.8</Text>
-            <Text style={styles.reviews}>(124)</Text>
-          </View>
-          
-          <View style={styles.locationContainer}>
-            <MapPin size={12} color="#9ca3af" />
-            <Text style={styles.location}>
-              {creche.suburb}, {creche.city}
-            </Text>
-          </View>
-        </View>
-        
-        <Text style={styles.price}>
-          {creche.monthly_price
-            ? `R${creche.monthly_price}/month`
-            : creche.weekly_price
-            ? `R${creche.weekly_price}/week`
-            : creche.price
-            ? `R${creche.price}/day`
-            : 'Contact for pricing'}
-        </Text>
-      </View>
-    </Pressable>
-  );
-
   return (
     <>
-      <ScrollView
+      <AnimatedScrollView
         style={styles.container}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
-            colors={['#2563eb']}
-            tintColor={'#2563eb'}
+            colors={['#bd4ab5']}
+            tintColor={'#bd4ab5'}
           />
         }
       >
         {/* Header */}
-        <View style={styles.header}>
+        <AnimatedView style={[styles.header, headerAnimatedStyle]}>
           <View style={styles.headerTop}>
-            <Pressable style={styles.menuButton} onPress={() => setSideMenuVisible(true)}>
+            <AnimatedPressable 
+              style={styles.menuButton} 
+              onPress={() => setSideMenuVisible(true)}
+            >
               <Menu size={24} color="#374151" />
-            </Pressable>
-                    <View style={styles.logoContainer}>
-                      <Image 
-                        source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
-                        style={styles.logoImage}
-                        resizeMode="contain"
-                      />
-                    </View>
+            </AnimatedPressable>
             
-            <Pressable style={styles.notificationButton}>
+            <AnimatedView 
+              style={styles.logoContainer}
+              entering={ZoomIn.duration(800).springify()}
+            >
+              <Image 
+                source={require('@/assets/images/SplashScreen.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </AnimatedView>
+            
+            <AnimatedPressable 
+              style={styles.notificationButton}
+            >
               <Bell size={24} color="#374151" />
-              <View style={styles.notificationBadge} />
-            </Pressable>
+              <FloatingNotificationBadge />
+            </AnimatedPressable>
           </View>
           
-          <Text style={styles.welcomeText}>
+          <AnimatedText 
+            style={styles.welcomeText}
+            entering={FadeInUp.delay(200).duration(800).springify()}
+          >
             Welcome back{profile?.first_name ? `, ${profile.first_name}` : ''}!
-          </Text>
-          <Text style={styles.locationText}>
+          </AnimatedText>
+          
+          <AnimatedText 
+            style={styles.locationText}
+            entering={FadeInUp.delay(400).duration(800).springify()}
+          >
             📍{' '}
             {profile
               ? [profile.suburb, profile.city, profile.province].filter(Boolean).join(', ') ||
                 'Update your location in profile'
               : 'Loading location...'}
-          </Text>
-        </View>
+          </AnimatedText>
+        </AnimatedView>
 
         {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <Pressable 
-            style={[styles.actionButton, { backgroundColor: '#f68484' }]}
+        <AnimatedView 
+          style={styles.quickActions}
+          entering={FadeInUp.delay(600).duration(800).springify()}
+        >
+          <AnimatedActionButton
+            emoji="🔍"
+            text="Find Creches"
+            backgroundColor="#f68484"
+            delay={700}
             onPress={() => router.push('/search')}
-          >
-            <Text style={styles.actionEmoji}>🔍</Text>
-            <Text style={styles.actionText}>Find Creches</Text>
-          </Pressable>
+          />
           
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: '#9cdcb8' }]}
+          <AnimatedActionButton
+            emoji="👶"
+            text="My Children"
+            backgroundColor="#9cdcb8"
+            delay={800}
             onPress={() => router.push('/children')}
-          >
-            <Text style={styles.actionEmoji}>👶</Text>
-            <Text style={styles.actionText}>My Children</Text>
-          </Pressable>
+          />
           
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: '#84a7f6' }]}
+          <AnimatedActionButton
+            emoji="📋"
+            text="Applications"
+            backgroundColor="#84a7f6"
+            delay={900}
             onPress={() => router.push('/applications')}
-          >
-            <Text style={styles.actionEmoji}>📋</Text>
-            <Text style={styles.actionText}>Applications</Text>
-          </Pressable>
+          />
           
-          <Pressable 
-            style={[styles.actionButton, { backgroundColor: '#f6cc84' }]}
+          <AnimatedActionButton
+            emoji="📰"
+            text="Feeds"
+            backgroundColor="#f6cc84"
+            delay={1000}
             onPress={() => router.push('/feeds')}
-          >
-            <Text style={styles.actionEmoji}>📰</Text>
-            <Text style={styles.actionText}>Feeds</Text>
-          </Pressable>
-        </View>
+          />
+        </AnimatedView>
 
         {/* Nearby Creches Section */}
-        <View style={styles.section}>
+        <AnimatedView 
+          style={styles.section}
+          entering={FadeInUp.delay(1100).duration(800).springify()}
+        >
           <Text style={styles.sectionTitle}>Nearby Creches</Text>
           <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
           
           {error ? (
-            <View style={styles.errorContainer}>
+            <AnimatedView 
+              style={styles.errorContainer}
+              entering={BounceIn.duration(800)}
+            >
               <Text style={styles.errorText}>{error}</Text>
               <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
                 <Text style={styles.retryButtonText}>Retry</Text>
               </Pressable>
-            </View>
+            </AnimatedView>
           ) : loading ? (
-            <View style={styles.loadingContainer}>
+            <AnimatedView 
+              style={styles.loadingContainer}
+              entering={FadeIn.duration(600)}
+            >
               <Text style={styles.loadingText}>Loading creches...</Text>
-            </View>
+            </AnimatedView>
           ) : creches.length > 0 ? (
             <ScrollView 
               horizontal 
@@ -224,56 +502,76 @@ export default function HomeScreen() {
               contentContainerStyle={styles.crechesScrollContent}
             >
               <View style={styles.crechesContainer}>
-                {creches.map(renderCrecheCard)}
+                {creches.map((creche, index) => (
+                  <AnimatedCrecheCard
+                    key={creche.id}
+                    creche={creche}
+                    index={index}
+                    onPress={() => router.push(`/search/${creche.id}`)}
+                  />
+                ))}
               </View>
             </ScrollView>
           ) : (
-            <View style={styles.emptyContainer}>
+            <AnimatedView 
+              style={styles.emptyContainer}
+              entering={BounceIn.duration(800)}
+            >
               <Text style={styles.emptyText}>No creches found in your area</Text>
               <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
                 <Text style={styles.retryButtonText}>Try Again</Text>
               </Pressable>
-            </View>
+            </AnimatedView>
           )}
-        </View>
+        </AnimatedView>
 
         {/* Application Status */}
-        <View style={styles.section}>
+        <AnimatedView 
+          style={styles.section}
+          entering={FadeInUp.delay(1200).duration(800).springify()}
+        >
           <Text style={styles.sectionTitle}>Application Status</Text>
           
-          <View style={styles.activityItem}>
-            <View style={[styles.activityIcon, { backgroundColor: '#f59e0b' }]}>
-              <Clock size={16} color="#ffffff" />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Under Review</Text>
-              <Text style={styles.activityDescription}>
-                2 applications are currently being reviewed by creches
-              </Text>
-            </View>
-          </View>
+          <AnimatedActivityItem
+            icon={Clock}
+            title="Under Review"
+            description="2 applications are currently being reviewed by creches"
+            backgroundColor="#f59e0b"
+            delay={1300}
+          />
           
-          <View style={styles.activityItem}>
-            <View style={[styles.activityIcon, { backgroundColor: '#22c55e' }]}>
-              <Users size={16} color="#ffffff" />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Application Accepted</Text>
-              <Text style={styles.activityDescription}>
-                Sunshine Daycare accepted your application for Emma
-              </Text>
-            </View>
-          </View>
-        </View>
+          <AnimatedActivityItem
+            icon={Users}
+            title="Application Accepted"
+            description="Sunshine Daycare accepted your application for Emma"
+            backgroundColor="#22c55e"
+            delay={1500}
+          />
+        </AnimatedView>
 
         {/* Bottom Padding */}
         <View style={styles.bottomPadding} />
-      </ScrollView>
+      </AnimatedScrollView>
 
       <SideMenu visible={sideMenuVisible} onClose={() => setSideMenuVisible(false)} />
     </>
   );
 }
+
+// Add these animation components
+const FadeInLeft = {
+  0: {
+    opacity: 0,
+    transform: [{ translateX: -50 }],
+  },
+  1: {
+    opacity: 1,
+    transform: [{ translateX: 0 }],
+  },
+};
+
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -302,27 +600,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: 200, // Adjust based on your logo dimensions
-    height: 60, // Adjust based on your logo dimensions
+    width: 200,
+    height: 60,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-  },
-  letterBlock: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 1,
-    opacity: 0.9,
-  },
-  letterText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   notificationButton: {
     width: 40,
@@ -464,7 +748,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontWeight: 'bold',
-    color: '#2563eb',
+    color: '#bd4ab5',
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -501,7 +785,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#bd4ab5',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

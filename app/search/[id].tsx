@@ -1,5 +1,5 @@
 // app/search/[id].tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Linking,
   ActivityIndicator,
   Share,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -147,14 +148,13 @@ const SkeletonLoader = () => {
             <View style={styles.skeletonSocialButton} />
           </View>
         </View>
-
-        {/* Action Buttons Skeleton */}
-        <View style={styles.actionSection}>
-          <View style={styles.skeletonPrimaryButton} />
-          <View style={styles.skeletonSecondaryButton} />
-          <View style={styles.skeletonTertiaryButton} />
-        </View>
       </ScrollView>
+
+      {/* Floating Buttons Skeleton */}
+      <View style={styles.floatingButtonsSkeleton}>
+        <View style={styles.skeletonFloatingButton} />
+        <View style={styles.skeletonFloatingButton} />
+      </View>
     </View>
   );
 };
@@ -168,6 +168,9 @@ export default function CrecheDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchCrecheDetails();
@@ -175,6 +178,18 @@ export default function CrecheDetailScreen() {
       checkIfFavorite();
     }
   }, [id, user]);
+
+  // Animate header when scrolling
+  useEffect(() => {
+    const listener = scrollY.addListener(({ value }) => {
+      const opacity = Math.min(value / 100, 1);
+      headerOpacity.setValue(opacity);
+    });
+
+    return () => {
+      scrollY.removeListener(listener);
+    };
+  }, []);
 
   const fetchCrecheDetails = async () => {
     try {
@@ -246,6 +261,7 @@ export default function CrecheDetailScreen() {
 
   const toggleFavorite = async () => {
     if (!user) {
+      router.push('/auth/login');
       return;
     }
 
@@ -279,6 +295,14 @@ export default function CrecheDetailScreen() {
     }
   };
 
+  const handleApplyNow = () => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    router.push(`/apply/${creche?.id}`);
+  };
+
   if (loading) {
     return <SkeletonLoader />;
   }
@@ -307,6 +331,16 @@ export default function CrecheDetailScreen() {
         resizeMode="cover"
       />
 
+      {/* Animated Header Background */}
+      <Animated.View 
+        style={[
+          styles.animatedHeader,
+          {
+            opacity: headerOpacity,
+          }
+        ]}
+      />
+
       {/* Back Button */}
       <Pressable style={styles.backButton} onPress={() => router.back()}>
         <ChevronLeft size={24} color="#000" />
@@ -317,7 +351,14 @@ export default function CrecheDetailScreen() {
         <Share2 size={20} color="#000" />
       </Pressable>
 
-      <ScrollView style={styles.content}>
+      <Animated.ScrollView 
+        style={styles.content}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
         {/* Basic Info */}
         <View style={styles.section}>
           <View style={styles.titleRow}>
@@ -473,30 +514,39 @@ export default function CrecheDetailScreen() {
           </View>
         )}
 
-        {/* Action Buttons */}
-        <View style={styles.actionSection}>
-          <Pressable style={styles.primaryButton} onPress={() => router.push(`/apply/${creche.id}`)}>
-            <Text style={styles.primaryButtonText}>Apply Now</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.secondaryButton, isFavorite && styles.favoriteActive]}
-            onPress={toggleFavorite}
-            disabled={favoriteLoading || !user}
-          >
+        {/* Spacer for floating buttons */}
+        <View style={styles.bottomSpacer} />
+      </Animated.ScrollView>
+
+      {/* Floating Action Buttons */}
+      <View style={styles.floatingButtons}>
+        <Pressable 
+          style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
+          onPress={toggleFavorite}
+          disabled={favoriteLoading}
+        >
+          {favoriteLoading ? (
+            <ActivityIndicator size="small" color={isFavorite ? "#ffffff" : "#374151"} />
+          ) : (
             <Heart
               size={20}
-              color={isFavorite ? '#ef4444' : '#374151'}
-              fill={isFavorite ? '#ef4444' : 'transparent'}
+              color={isFavorite ? '#ffffff' : '#374151'}
+              fill={isFavorite ? '#ffffff' : 'transparent'}
             />
-            <Text style={[styles.secondaryButtonText, isFavorite && styles.favoriteActiveText]}>
-              {isFavorite ? 'Saved to Favorites' : 'Save to Favorites'}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.tertiaryButton}>
-            <Text style={styles.tertiaryButtonText}>Schedule Visit</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+          )}
+          <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
+            {isFavorite ? 'Saved' : 'Save'}
+          </Text>
+        </Pressable>
+
+        <Pressable 
+          style={styles.applyButton} 
+          onPress={handleApplyNow}
+        >
+          <Text style={styles.applyButtonText}>Apply Now</Text>
+          <Send size={16} color="#ffffff" />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -515,6 +565,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 250,
   },
+  animatedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
   backButton: {
     position: 'absolute',
     top: 50,
@@ -530,6 +590,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 10,
   },
   shareButton: {
     position: 'absolute',
@@ -546,6 +607,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 10,
   },
   content: {
     flex: 1,
@@ -681,56 +743,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionSection: {
-    padding: 20,
+  bottomSpacer: {
+    height: 100, // Space for floating buttons
+  },
+  // Floating Buttons
+  floatingButtons: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
     gap: 12,
+    backgroundColor: 'transparent',
   },
-  primaryButton: {
-    backgroundColor: '#bd4ab5',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
+  favoriteButton: {
+    flex: 1,
     backgroundColor: '#f3f4f6',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  secondaryButtonText: {
-    color: '#374151',
+  favoriteButtonActive: {
+    backgroundColor: '#bd4ab5',
+    borderColor: '#bd4ab5',
+  },
+  favoriteButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#374151',
   },
-  favoriteActive: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fecaca',
+  favoriteButtonTextActive: {
+    color: '#ffffff',
   },
-  favoriteActiveText: {
-    color: '#ef4444',
-  },
-  tertiaryButton: {
-    backgroundColor: 'transparent',
+  applyButton: {
+    flex: 2,
+    backgroundColor: '#bd4ab5',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#bd4ab5',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  tertiaryButtonText: {
-    color: '#bd4ab5',
+  applyButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#ffffff',
   },
   loadingText: {
     marginTop: 12,
@@ -894,21 +967,18 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: '#e5e7eb',
   },
-  skeletonPrimaryButton: {
-    height: 52,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 12,
+  floatingButtonsSkeleton: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    gap: 12,
   },
-  skeletonSecondaryButton: {
+  skeletonFloatingButton: {
+    flex: 1,
     height: 52,
     backgroundColor: '#e5e7eb',
     borderRadius: 12,
-  },
-  skeletonTertiaryButton: {
-    height: 52,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
 });
