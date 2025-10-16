@@ -19,8 +19,8 @@ import { Plus, BookOpen, Search, MapPin, Heart, MessageCircle, Share as ShareIco
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
-import ArticleCard from '@/components/ArticleCard';
-import CreatePostModal from '@/components/CreatePostModal';
+import ArticleCard from '@/components/feed/ArticleCard';
+import CreatePostModal from '@/components/feed/CreatePostModal';
 
 interface Creche {
   id: string;

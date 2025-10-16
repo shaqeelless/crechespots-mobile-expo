@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Heart, Share2, Clock, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import CommentSection from '@/components/CommentSection';
+import CommentSection from '@/components/feed/CommentSection';
 
 interface Article {
   id: string;
