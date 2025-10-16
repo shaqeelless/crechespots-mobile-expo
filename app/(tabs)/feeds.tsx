@@ -1,23 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  Share,
+  ActivityIndicator,
   FlatList,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  Image,
   Alert,
   Platform,
-  RefreshControl,
-  Image,
-  Pressable,
-  Share as RNShare,
-  ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Heart, MessageCircle, Plus, Search, MapPin, Bell, ArrowLeft, Share, Clock, BookOpen, Users } from 'lucide-react-native';
+import { Plus, BookOpen, Search, MapPin, Heart, MessageCircle, Share as ShareIcon, Bell, Users } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'expo-router';
+import ArticleCard from '@/components/ArticleCard';
+import CreatePostModal from '@/components/CreatePostModal';
 
 interface Creche {
   id: string;
@@ -40,22 +43,31 @@ interface Article {
   created_at: string;
   hearts: number;
   creche_id: string;
-  creches: {
+  author_id: string;
+  creches?: {
     name: string;
     logo: string;
-    suburb: string;
-    province?: string;
+    suburb?: string;
+    province: string;
   };
-  article_likes: Array<{
+  users?: {
+    first_name?: string;
+    last_name?: string;
+    display_name?: string;
+    profile_picture_url?: string;
+  };
+  comment_count?: number;
+  user_has_liked?: boolean;
+  article_likes?: Array<{
     user_id: string;
   }>;
-  article_comments: Array<{
+  article_comments?: Array<{
     id: string;
     article_id: string;
     user_id: string;
     content: string;
     created_at: string;
-    users: {  // Changed from profiles to users
+    users: {
       id: string;
       first_name?: string;
       last_name?: string;
@@ -64,7 +76,7 @@ interface Article {
   }>;
 }
 
-// Skeleton Loader Components
+// Skeleton Loader Component
 const SkeletonLoader = () => (
   <View style={styles.container}>
     {/* Header Skeleton */}
@@ -78,23 +90,27 @@ const SkeletonLoader = () => (
 
     {/* Tabs Skeleton */}
     <View style={styles.tabsWrapper}>
-      <View style={styles.communityTabsContent}>
+      <View style={styles.crecheTabsContent}>
         {[1, 2, 3].map((i) => (
-          <View key={i} style={[styles.skeleton, styles.communityTabSkeleton]} />
+          <View key={i} style={[styles.skeleton, styles.crecheTabSkeleton]} />
         ))}
       </View>
     </View>
 
-    {/* Post Input Skeleton */}
-    <View style={styles.postCreationContainer}>
-      <View style={[styles.skeleton, {height: 80, marginBottom: 12}]} />
-      <View style={[styles.skeleton, {width: 80, height: 40, alignSelf: 'flex-end'}]} />
+    {/* Filter Skeleton */}
+    <View style={styles.filterWrapper}>
+      <View style={[styles.skeleton, {width: 60, height: 20}]} />
+      <View style={styles.filterOptionsSkeleton}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={[styles.skeleton, {width: 60, height: 20}]} />
+        ))}
+      </View>
     </View>
 
     {/* Posts Skeleton */}
     {[1, 2, 3].map((i) => (
-      <View key={i} style={styles.postCard}>
-        <View style={styles.postHeader}>
+      <View key={i} style={styles.articleCard}>
+        <View style={styles.articleHeader}>
           <View style={styles.userInfoContainer}>
             <View style={[styles.skeleton, {width: 40, height: 40, borderRadius: 20, marginRight: 12}]} />
             <View>
@@ -112,16 +128,16 @@ const SkeletonLoader = () => (
 );
 
 export default function FeedsScreen() {
-  const { user } = useAuth();
-  const userId = user?.id ?? '';
-  const router = useRouter();
-
-  const [creches, setCreches] = useState<Creche[]>([]);
-  const [selectedCreche, setSelectedCreche] = useState<Creche | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
-  const [newArticle, setNewArticle] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
+
+  // New state for creche filtering
+  const [creches, setCreches] = useState<Creche[]>([]);
+  const [selectedCreche, setSelectedCreche] = useState<Creche | null>(null);
   const [showAddCreche, setShowAddCreche] = useState(false);
   const [allCreches, setAllCreches] = useState<Creche[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,9 +182,6 @@ export default function FeedsScreen() {
       await loadFollowerCounts(favoriteCrecheIds);
     } catch (error) {
       console.error('Error loading favorite creches:', error);
-    } finally {
-      setLoading(false);
-      setInitialLoadComplete(true);
     }
   }, []);
 
@@ -213,57 +226,6 @@ export default function FeedsScreen() {
       console.error('Error loading follower counts:', error);
     }
   }, []);
-
-  // Load articles for selected creche
-const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
-  if (!creche) return;
-
-  try {
-    let query = supabase
-      .from('articles')
-      .select(`
-        *,
-        creches(name, logo, suburb, province),
-        article_likes(*),
-        article_comments(*, users!article_comments_user_id_fkey(
-          id, 
-          first_name, 
-          last_name, 
-          profile_picture_url
-        ))
-      `)
-      .eq('creche_id', creche.id);
-
-    // Apply filters
-    if (postFilter === 'popular') {
-      query = query.order('hearts', { ascending: false });
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    // Ensure proper fallbacks for user data
-    const articlesWithFallbacks = (data || []).map((article: any) => ({
-      ...article,
-      article_comments: (article.article_comments || []).map((comment: any) => ({
-        ...comment,
-        users: comment.users || {
-          first_name: 'User',
-          last_name: '',
-          profile_picture_url: 'https://crechespots.co.za/brand.png'
-        }
-      }))
-    }));
-
-    setArticles(articlesWithFallbacks);
-  } catch (error) {
-    console.error('Error loading articles:', error);
-    setArticles([]);
-  }
-}, [postFilter]);
 
   // Load notification count
   const loadNotificationCount = useCallback(async (uid: string) => {
@@ -313,54 +275,195 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
     };
   }, [user?.id, loadFavoriteCreches, loadNotificationCount]);
 
-  useEffect(() => {
-    if (selectedCreche) {
-      loadCrecheArticles(selectedCreche);
-    } else {
-      setArticles([]);
-    }
-  }, [selectedCreche, loadCrecheArticles]);
+  // Fetch articles based on selected creche and filter
+  const fetchFeedArticles = useCallback(async () => {
+    try {
+      setLoading(true);
 
-  // Handlers
+      if (!user) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      // If no creche selected, show articles from all favorite creches
+      const crecheIds = selectedCreche 
+        ? [selectedCreche.id]
+        : creches.map(c => c.id);
+
+      if (crecheIds.length === 0) {
+        setArticles([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      let query = supabase
+        .from('articles')
+        .select(
+          `
+          id,
+          title,
+          content,
+          type,
+          created_at,
+          hearts,
+          creche_id,
+          author_id,
+          creches(name, logo, suburb, province),
+          users(first_name, last_name, display_name, profile_picture_url)
+        `,
+          { count: 'exact' }
+        )
+        .in('creche_id', crecheIds);
+
+      // Apply filters
+      if (postFilter === 'popular') {
+        query = query.order('hearts', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      query = query.limit(50);
+
+      const { data: articlesData, error } = await query;
+
+      if (error) throw error;
+
+      const { data: userLikes } = await supabase
+        .from('user_likes')
+        .select('article_id')
+        .eq('user_id', user.id);
+
+      const likedArticleIds = new Set(userLikes?.map((like) => like.article_id) || []);
+
+      const { data: commentCounts } = await supabase
+        .from('article_comments')
+        .select('article_id')
+        .in(
+          'article_id',
+          articlesData?.map((a) => a.id) || []
+        );
+
+      const commentCountMap = new Map<string, number>();
+      commentCounts?.forEach((comment) => {
+        const count = commentCountMap.get(comment.article_id) || 0;
+        commentCountMap.set(comment.article_id, count + 1);
+      });
+
+      const enrichedArticles = articlesData?.map((article) => ({
+        ...article,
+        user_has_liked: likedArticleIds.has(article.id),
+        comment_count: commentCountMap.get(article.id) || 0,
+      }));
+
+      setArticles(enrichedArticles || []);
+    } catch (error) {
+      console.error('Error fetching feed articles:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user, selectedCreche, creches, postFilter]);
+
+  useEffect(() => {
+    fetchFeedArticles();
+  }, [fetchFeedArticles]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     if (user?.id) {
       await loadFavoriteCreches(user.id);
     }
-    await loadCrecheArticles(selectedCreche);
+    await fetchFeedArticles();
     
     // Refresh follower counts
     const allCrecheIds = [...creches.map(c => c.id), ...allCreches.map(c => c.id)];
     await loadFollowerCounts(allCrecheIds);
     
     setRefreshing(false);
-  }, [user?.id, selectedCreche, loadFavoriteCreches, loadCrecheArticles, loadFollowerCounts, creches, allCreches]);
+  }, [user?.id, selectedCreche, loadFavoriteCreches, fetchFeedArticles, loadFollowerCounts, creches, allCreches]);
 
-  const createArticle = useCallback(async () => {
-    if (!newArticle.trim() || !selectedCreche || !user?.id) return;
-    
+  const handleLike = async (articleId: string) => {
+    if (!user) return;
+
     try {
-      const { error } = await supabase
-        .from('articles')
-        .insert([{
-          title: newArticle.substring(0, 100), // First 100 chars as title
-          content: newArticle.trim(),
-          type: 'update',
-          creche_id: selectedCreche.id,
-          author_id: user.id,
-          latitude: 0, // You might want to get actual location
-          longitude: 0,
-        }]);
+      const article = articles.find((a) => a.id === articleId);
+      const isLiked = article?.user_has_liked;
+
+      setArticles(
+        articles.map((a) =>
+          a.id === articleId
+            ? {
+                ...a,
+                user_has_liked: !isLiked,
+                hearts: isLiked ? a.hearts - 1 : a.hearts + 1,
+              }
+            : a
+        )
+      );
+
+      if (isLiked) {
+        const { error } = await supabase
+          .from('user_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('article_id', articleId);
+
+        if (error) throw error;
+
+        await supabase.rpc('decrement_article_hearts', { article_id: articleId });
+      } else {
+        const { error } = await supabase.from('user_likes').insert({
+          user_id: user.id,
+          article_id: articleId,
+        });
+
+        if (error) throw error;
+
+        await supabase.rpc('increment_article_hearts', { article_id: articleId });
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      fetchFeedArticles();
+    }
+  };
+
+  const handleComment = (articleId: string) => {
+    router.push(`/article/${articleId}`);
+  };
+
+  const handleShare = async (article: Article) => {
+    try {
+      await Share.share({
+        message: `${article.title}\n\n${article.content.substring(0, 100)}...`,
+      });
+    } catch (error) {
+      console.error('Error sharing article:', error);
+    }
+  };
+
+  const handleCreatePost = async (title: string, content: string, type: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from('articles').insert({
+        title,
+        content,
+        type,
+        author_id: user.id,
+        creche_id: selectedCreche?.id || null,
+        hearts: 0,
+      });
 
       if (error) throw error;
 
-      setNewArticle('');
-      await loadCrecheArticles(selectedCreche);
+      await fetchFeedArticles();
     } catch (error) {
-      console.error('Error creating article:', error);
-      Alert.alert('Error', 'Failed to create post');
+      console.error('Error creating post:', error);
+      throw error;
     }
-  }, [newArticle, selectedCreche, user?.id, loadCrecheArticles]);
+  };
 
   const toggleFavorite = useCallback(async (crecheId: string) => {
     if (!user?.id) return;
@@ -395,93 +498,11 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
     }
   }, [user?.id, creches, loadFavoriteCreches]);
 
-  const toggleLike = useCallback(async (articleId: string) => {
-    if (!user?.id) return;
-    
-    try {
-      const article = articles.find(a => a.id === articleId);
-      if (!article) return;
-
-      const existingLike = article.article_likes.find(like => like.user_id === user.id);
-
-      if (existingLike) {
-        // Unlike
-        await supabase
-          .from('article_likes')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('article_id', articleId);
-
-        // Update hearts count
-        await supabase
-          .from('articles')
-          .update({ hearts: Math.max(0, article.hearts - 1) })
-          .eq('id', articleId);
-      } else {
-        // Like
-        await supabase
-          .from('article_likes')
-          .insert([{
-            user_id: user.id,
-            article_id: articleId,
-          }]);
-
-        // Update hearts count
-        await supabase
-          .from('articles')
-          .update({ hearts: (article.hearts || 0) + 1 })
-          .eq('id', articleId);
-      }
-
-      // Reload articles to show updated likes
-      await loadCrecheArticles(selectedCreche);
-    } catch (error) {
-      console.error('Error toggling like:', error);
-    }
-  }, [user?.id, articles, selectedCreche, loadCrecheArticles]);
-
-  const shareArticle = async (article: Article) => {
-    try {
-      setSharingArticle(true);
-      
-      const crecheName = article.creches.name;
-      const shareUrl = `https://crechespots.co.za/article/${article.id}`;
-      
-      const message = `Check out this update from ${crecheName} on CrecheSpots: ${shareUrl}`;
-
-      if (Platform.OS === 'web') {
-        await navigator.clipboard.writeText(message);
-        Alert.alert('Copied to clipboard', 'Article link has been copied to your clipboard');
-      } else {
-        await RNShare.share({
-          message: message,
-          title: `Update from ${crecheName}`,
-        });
-      }
-    } catch (error) {
-      console.error('Error sharing article:', error);
-    } finally {
-      setSharingArticle(false);
-    }
-  };
-
-  // Derived data
   const filteredCreches = useMemo(() => {
     if (!searchQuery.trim()) return allCreches;
     const q = searchQuery.toLowerCase();
     return allCreches.filter(c => c.name.toLowerCase().includes(q));
   }, [allCreches, searchQuery]);
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return date.toLocaleDateString();
-  };
 
   const getLocationText = (creche: any) => {
     if (!creche) return 'Location not available';
@@ -491,22 +512,6 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
     return creche.suburb || creche.province || 'Location not specified';
   };
 
-  const getCategoryColor = (type: string) => {
-    const colors: Record<string, string> = {
-      'helpful': '#84a7f6',
-      'events': '#9cdcb8',
-      'donation': '#f68484',
-      'news': '#f68484',
-      'tips': '#84a7f6',
-      'activities': '#f6cc84',
-      'announcements': '#2563eb',
-      'safety': '#f684a3',
-      'update': '#9cdcb8',
-    };
-    return colors[type?.toLowerCase()] || '#2563eb';
-  };
-
-  // Renderers
   const renderCrecheTab = ({ item }: { item: Creche }) => {
     const selected = selectedCreche?.id === item.id;
     const followerCount = followerCounts[item.id] || 0;
@@ -534,93 +539,26 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
     );
   };
 
-  const renderArticle = ({ item: article }: { item: Article }) => {
-    const likeCount = article.hearts || 0;
-    const hasUserLiked = article.article_likes.some(like => like.user_id === userId);
-    const latestComment = article.article_comments[article.article_comments.length - 1];
-
-    return (
-      <Pressable
-        style={styles.articleCard}
-        onPress={() => router.push(`/article/${article.id}`)}
-      >
-        <View style={styles.articleHeader}>
-          <View style={styles.crecheInfoContainer}>
-            <Image 
-              source={{ uri: article.creches.logo || 'https://crechespots.co.za/brand.png' }} 
-              style={styles.crecheAvatar} 
-            />
-            <View>
-              <Text style={styles.crecheName}>{article.creches.name}</Text>
-              <View style={styles.locationRow}>
-                <MapPin size={12} color="#9ca3af" />
-                <Text style={styles.location}>
-                  {getLocationText(article.creches)}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <Text style={styles.articleTime}>{formatTimeAgo(article.created_at)}</Text>
-        </View>
-
-        {article.type && (
-          <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(article.type) }]}>
-            <Text style={styles.categoryText}>{article.type.toUpperCase()}</Text>
-          </View>
-        )}
-
-        <Text style={styles.articleTitle}>{article.title}</Text>
-        <Text style={styles.articleContent} numberOfLines={3}>
-          {article.content}
-        </Text>
-
-        <View style={styles.engagementRow}>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => toggleLike(article.id)}
-          >
-            <Heart 
-              size={18} 
-              color={hasUserLiked ? '#ef4444' : '#6b7280'} 
-              fill={hasUserLiked ? '#ef4444' : 'none'} 
-            />
-            <Text style={[styles.actionCount, hasUserLiked && { color: '#ef4444' }]}>
-              {likeCount}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push(`/article/${article.id}`)}
-          >
-            <MessageCircle size={18} color="#6b7280" />
-            <Text style={styles.actionCount}>{article.article_comments.length}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => shareArticle(article)}
-            disabled={sharingArticle}
-          >
-            <Share size={18} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
-
-        {latestComment && (
-          <View style={styles.latestComment}>
-            <Text style={styles.commentAuthor}>{latestComment.profiles.first_name}: </Text>
-            <Text style={styles.commentText} numberOfLines={1}>
-              {latestComment.content}
-            </Text>
-          </View>
-        )}
-      </Pressable>
-    );
-  };
-
-  // Main render
   if (!initialLoadComplete || loading) {
     return <SkeletonLoader />;
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Your Feeds</Text>
+          <Text style={styles.headerSubtitle}>Updates from your favorite creches</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <BookOpen size={64} color="#d1d5db" />
+          <Text style={styles.emptyTitle}>Please log in</Text>
+          <Text style={styles.emptyDescription}>
+            Log in to view feeds and interact with posts
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   if (showAddCreche) {
@@ -628,9 +566,9 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setShowAddCreche(false)} style={styles.backButton}>
-            <ArrowLeft size={24} color="#374151" />
+            <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Creche</Text>
+          <Text style={styles.headerTitle}>Follow Creches</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -724,7 +662,10 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Feeds</Text>
+        <View>
+          <Text style={styles.headerTitle}>Your Feeds</Text>
+          <Text style={styles.headerSubtitle}>Updates from your favorite creches</Text>
+        </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.notificationButton} onPress={() => router.push('/notifications')}>
             <Bell size={24} color="#374151" />
@@ -734,23 +675,38 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addIconButton} onPress={() => setShowAddCreche(true)}>
-            <Plus size={24} color="#2563eb" />
-          </TouchableOpacity>
+          <Pressable style={styles.createButton} onPress={() => setShowCreateModal(true)}>
+            <Plus size={24} color="#ffffff" />
+          </Pressable>
         </View>
       </View>
 
       {/* Creche Tabs */}
-      <View style={styles.tabsWrapper}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={creches}
-          keyExtractor={(item) => item.id}
-          renderItem={renderCrecheTab}
-          contentContainerStyle={styles.crecheTabsContent}
-        />
-      </View>
+      {creches.length > 0 && (
+        <View style={styles.tabsWrapper}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={creches}
+            keyExtractor={(item) => item.id}
+            renderItem={renderCrecheTab}
+            contentContainerStyle={styles.crecheTabsContent}
+            ListHeaderComponent={
+              <Pressable
+                onPress={() => setSelectedCreche(null)}
+                style={[styles.crecheTab, !selectedCreche && styles.selectedTab]}
+              >
+                <View style={styles.crecheTabContent}>
+                  <Users size={20} color={!selectedCreche ? '#ffffff' : '#64748b'} />
+                  <Text style={[styles.crecheTabText, !selectedCreche && styles.selectedTabText]}>
+                    All
+                  </Text>
+                </View>
+              </Pressable>
+            }
+          />
+        </View>
+      )}
 
       {/* Filter Options */}
       <View style={styles.filterWrapper}>
@@ -774,42 +730,51 @@ const loadCrecheArticles = useCallback(async (creche: Creche | null) => {
         </View>
       </View>
 
-      {/* Articles List */}
-      <FlatList
-        data={articles}
-        keyExtractor={(item) => item.id}
-        renderItem={renderArticle}
-        ListHeaderComponent={
-          selectedCreche ? (
-            <View style={styles.postCreationContainer}>
-              <TextInput
-                style={styles.postInput}
-                placeholder="Share an update with parents..."
-                placeholderTextColor="#9ca3af"
-                value={newArticle}
-                onChangeText={setNewArticle}
-                multiline
-                maxLength={500}
-              />
-              <TouchableOpacity
-                style={[styles.postButton, !newArticle.trim() && styles.postButtonDisabled]}
-                onPress={createArticle}
-                disabled={!newArticle.trim()}
-              >
-                <Text style={styles.postButtonText}>Post</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyPosts}>
-            <BookOpen size={64} color="#d1d5db" />
-            <Text style={styles.emptyPostsText}>No Posts Yet</Text>
-            <Text style={styles.emptyPostsSubtext}>Be the first to share an update from this creche</Text>
-          </View>
-        }
+      <ScrollView
+        style={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingBottom: 24 }}
+      >
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={styles.loadingText}>Loading your feeds...</Text>
+          </View>
+        ) : articles.length > 0 ? (
+          <View style={styles.articlesContainer}>
+            {articles.map((article) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                onLike={handleLike}
+                onComment={handleComment}
+                onShare={handleShare}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <BookOpen size={64} color="#d1d5db" />
+            <Text style={styles.emptyTitle}>
+              {selectedCreche ? 'No posts from this creche' : 'No feeds yet'}
+            </Text>
+            <Text style={styles.emptyDescription}>
+              {selectedCreche 
+                ? 'This creche hasn\'t posted any updates yet.'
+                : 'Start favoriting creches to see their latest updates and articles here'
+              }
+            </Text>
+            <Pressable style={styles.exploreButton} onPress={() => router.push('/search')}>
+              <Text style={styles.exploreButtonText}>Explore Creches</Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
+
+      <CreatePostModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreatePost}
+        selectedCreche={selectedCreche}
       />
     </View>
   );
@@ -821,24 +786,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#f4fcfe',
   },
   header: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    backgroundColor: '#ffffff',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#374151',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  createButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   notificationButton: {
     backgroundColor: '#f3f4f6',
@@ -847,7 +829,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
     position: 'relative',
   },
   notificationBadge: {
@@ -878,12 +859,12 @@ const styles = StyleSheet.create({
     width: 44,
   },
   backButton: {
-    backgroundColor: '#f3f4f6',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#2563eb',
+    fontWeight: '600',
   },
   // Tabs
   tabsWrapper: {
@@ -964,161 +945,24 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     fontWeight: '600',
   },
-  // Post Creation
-  postCreationContainer: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    margin: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  postInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    marginBottom: 12,
-    backgroundColor: '#f9fafb',
-    color: '#374151',
-  },
-  postButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignSelf: 'flex-end',
-  },
-  postButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  postButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  // Article Card
-  articleCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  articleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  crecheInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  content: {
     flex: 1,
   },
-  crecheAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  crecheName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  location: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 4,
-  },
-  articleTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  categoryText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  articleTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-    lineHeight: 24,
-  },
-  articleContent: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  engagementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-  },
-  actionCount: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  latestComment: {
-    flexDirection: 'row',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  commentAuthor: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563eb',
-  },
-  commentText: {
-    fontSize: 14,
-    color: '#6b7280',
+  loadingContainer: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  articlesContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   // Search & Add Creche
   searchContainer: {
@@ -1204,22 +1048,28 @@ const styles = StyleSheet.create({
   },
   // Empty States
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    paddingVertical: 60,
+    paddingHorizontal: 20,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#374151',
+    marginTop: 16,
     marginBottom: 8,
-    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
     marginBottom: 24,
   },
   addButton: {
@@ -1236,20 +1086,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 16,
   },
-  emptyPosts: {
-    padding: 40,
-    alignItems: 'center',
+  exploreButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
-  emptyPostsText: {
-    fontSize: 18,
+  exploreButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  emptyPostsSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
   },
   // Skeleton styles
   skeleton: {
@@ -1257,14 +1103,38 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  communityTabSkeleton: {
+  crecheTabSkeleton: {
     minHeight: 36,
     width: 100,
     marginHorizontal: 4,
+  },
+  filterOptionsSkeleton: {
+    flexDirection: 'row',
+    gap: 20,
   },
   userInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  articleCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  articleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
 });
