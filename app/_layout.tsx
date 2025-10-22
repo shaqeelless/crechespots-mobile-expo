@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Image } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -12,7 +12,14 @@ function LayoutContent() {
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+        <Image 
+          source={require('@/assets/images/SplashScreen.png')}
+          style={{
+            width: 200, // Adjust as needed
+            height: 200, // Adjust as needed
+            resizeMode: 'contain'
+          }}
+        />
       </View>
     );
   }

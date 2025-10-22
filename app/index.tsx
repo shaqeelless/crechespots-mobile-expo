@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -32,7 +32,10 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <Image 
+          source={require('@/assets/images/SplashScreen.png')}
+          style={styles.logo}
+        />
       </View>
     );
   }
@@ -51,5 +54,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f4fcfe',
+  },
+  logo: {
+    width: 200, // Adjust as needed
+    height: 200, // Adjust as needed
+    resizeMode: 'contain'
   },
 });
