@@ -10,6 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { User, Settings, CreditCard, CircleHelp, Shield, LogOut, X, Star, Calendar, MapPin } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ interface SideMenuProps {
 }
 
 export default function SideMenu({ visible, onClose }: SideMenuProps) {
+  const router = useRouter();
   const slideAnim = useRef(new Animated.Value(-width)).current;
 
   useEffect(() => {
@@ -37,13 +39,28 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
     }
   }, [visible]);
 
+  const handleMenuItemPress = (route: string) => {
+    onClose(); // Close the menu first
+    // Small delay to allow menu to close before navigation
+    setTimeout(() => {
+      router.push(route as any);
+    }, 300);
+  };
+
+  const handleLogout = () => {
+    onClose();
+    // Add your logout logic here
+    console.log('Logout pressed');
+    // Example: router.replace('/login');
+  };
+
   const menuItems = [
-    { icon: User, label: 'Profile', color: '#f68484' },
-    { icon: MapPin, label: 'Saved Locations', color: '#f6cc84' },
-    { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6' },
-    { icon: Settings, label: 'Settings', color: '#f684a3' },
-    { icon: CircleHelp, label: 'Help & Support', color: '#9cdcb8' },
-    { icon: Shield, label: 'Safety Center', color: '#84a7f6' },
+    { icon: User, label: 'Profile', color: '#f68484', route: '/(tabs)/profile' },
+    { icon: MapPin, label: 'Saved Locations', color: '#f6cc84', route: '/favorites' },
+    { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6', route: '/(tabs)/payment-methods' },
+    { icon: Settings, label: 'Settings', color: '#f684a3', route: '/(tabs)/settings' },
+    { icon: CircleHelp, label: 'Help & Support', color: '#9cdcb8', route: '/(tabs)/help-support' },
+    { icon: Shield, label: 'Safety Center', color: '#84a7f6', route: '/(tabs)/safety-center' },
   ];
 
   return (
@@ -94,7 +111,11 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
             {menuItems.map((item, index) => {
               const IconComponent = item.icon;
               return (
-                <Pressable key={index} style={styles.menuItem}>
+                <Pressable 
+                  key={index} 
+                  style={styles.menuItem}
+                  onPress={() => handleMenuItemPress(item.route)}
+                >
                   <View style={[styles.menuIcon, { backgroundColor: item.color }]}>
                     <IconComponent size={20} color="#ffffff" />
                   </View>
@@ -106,12 +127,12 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Pressable style={styles.logoutButton}>
+            <Pressable style={styles.logoutButton} onPress={handleLogout}>
               <LogOut size={20} color="#ef4444" />
               <Text style={styles.logoutText}>Sign Out</Text>
             </Pressable>
             
-            <Text style={styles.version}>Version 1.0.0</Text>
+            <Text style={styles.version}>Version 1.0.1</Text>
           </View>
         </Animated.View>
       </View>
@@ -175,8 +196,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: 200, // Adjust based on your logo dimensions
-    height: 60, // Adjust based on your logo dimensions
+    width: 200,
+    height: 60,
   },
   logoContainer: {
     alignItems: 'center',

@@ -25,32 +25,32 @@ const onboardingSteps = [
     title: 'Find Trusted Childcare',
     subtitle: 'Your Trusted Link to Easy Childcare',
     description: 'Browse verified creches and daycares in your area with detailed profiles, photos, and parent reviews.',
-    backgroundColor: '#f68484',
-    color: '#ffffff',
+    backgroundColor: '#f4fcfe',
+    color: '#3a5dc4',
   },
   {
     id: 2,
     title: 'Verified & Safe',
     subtitle: 'Peace of Mind for Parents',
     description: 'All childcare providers are thoroughly vetted with background checks, certifications, and safety inspections.',
-    backgroundColor: '#9cdcb8',
-    color: '#ffffff',
+    backgroundColor: '#f4fcfe',
+    color: '#3a5dc4',
   },
   {
     id: 3,
     title: 'Apply Instantly',
     subtitle: 'Quick & Easy Applications',
     description: 'Submit applications to multiple creches instantly. Track your progress and get notifications when accepted.',
-    backgroundColor: '#84a7f6',
-    color: '#ffffff',
+    backgroundColor: '#f4fcfe',
+    color: '#3a5dc4',
   },
   {
     id: 4,
     title: "What's your name?",
     subtitle: 'Tell us about yourself',
     description: 'We need your name to create your parent profile and help creches get to know you.',
-    backgroundColor: '#f6cc84',
-    color: '#ffffff',
+    backgroundColor: '#f4fcfe',
+    color: '#3a5dc4',
     isForm: true,
     formType: 'name',
   },
@@ -59,7 +59,7 @@ const onboardingSteps = [
     title: 'Add a profile photo',
     subtitle: 'Let creches see who you are',
     description: 'A profile photo helps build trust with childcare providers. You can skip this step if you prefer.',
-    backgroundColor: '#bd84f6',
+    backgroundColor: '#f4fcfe',
     color: '#ffffff',
     isForm: true,
     formType: 'photo',
@@ -69,7 +69,7 @@ const onboardingSteps = [
     title: 'Contact information',
     subtitle: 'How can creches reach you?',
     description: 'We need your email and phone number so creches can contact you about applications.',
-    backgroundColor: '#f684a3',
+    backgroundColor: '#f4fcfe',
     color: '#ffffff',
     isForm: true,
     formType: 'contact',
@@ -194,7 +194,7 @@ export default function OnboardingScreen() {
             style={[
               styles.dot,
               {
-                backgroundColor: index === currentIndex ? '#bd4ab5' : 'rgba(255,255,255,0.5)',
+                backgroundColor: index === currentIndex ? '#bd4ab5' : '#3a5dc4',
                 width: index === currentIndex ? 24 : 8,
               },
             ]}
@@ -210,22 +210,22 @@ export default function OnboardingScreen() {
         return (
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
-              <User size={20} color="rgba(255,255,255,0.8)" />
+              <User size={20} color="#3a5dc4" />
               <TextInput
                 style={styles.input}
                 placeholder="First Name"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="#3a5dc4"
                 value={formData.firstName}
                 onChangeText={(text) => setFormData({ ...formData, firstName: text })}
                 autoCapitalize="words"
               />
             </View>
             <View style={styles.inputContainer}>
-              <User size={20} color="rgba(255,255,255,0.8)" />
+              <User size={20} color="#3a5dc4" />
               <TextInput
                 style={styles.input}
                 placeholder="Last Name"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="#3a5dc4"
                 value={formData.lastName}
                 onChangeText={(text) => setFormData({ ...formData, lastName: text })}
                 autoCapitalize="words"
@@ -241,7 +241,7 @@ export default function OnboardingScreen() {
               {formData.profilePhoto ? (
                 <Image source={{ uri: formData.profilePhoto }} style={styles.profileImage} />
               ) : (
-                <Camera size={48} color="rgba(255,255,255,0.8)" />
+                <Camera size={48} color="#3a5dc4" />
               )}
             </View>
             <Pressable style={styles.photoButton}>
@@ -259,11 +259,11 @@ export default function OnboardingScreen() {
         return (
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
-              <Mail size={20} color="rgba(255,255,255,0.8)" />
+              <Mail size={20} color="#3a5dc4" />
               <TextInput
                 style={styles.input}
                 placeholder="Email Address"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="#3a5dc4"
                 value={formData.email}
                 onChangeText={(text) => setFormData({ ...formData, email: text })}
                 keyboardType="email-address"
@@ -271,11 +271,11 @@ export default function OnboardingScreen() {
               />
             </View>
             <View style={styles.inputContainer}>
-              <Phone size={20} color="rgba(255,255,255,0.8)" />
+              <Phone size={20} color="#3a5dc4" />
               <TextInput
                 style={styles.input}
                 placeholder="Phone Number"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="#3a5dc4"
                 value={formData.phone}
                 onChangeText={(text) => setFormData({ ...formData, phone: text })}
                 keyboardType="phone-pad"
@@ -340,7 +340,7 @@ export default function OnboardingScreen() {
              currentStep.formType === 'contact' ? 'Create Account' : 
              currentStep.formType === 'photo' ? 'Continue' : 'Next'}
           </Text>
-          {!loading && <ArrowRight size={20} color="#ffffff" />}
+          {!loading && <ArrowRight size={20} color="#3a5dc4" />}
         </Pressable>
       </View>
     </View>
