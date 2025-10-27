@@ -69,12 +69,12 @@ export default function ArticleCard({ article, onLike, onComment, onShare }: Art
     return date.toLocaleDateString();
   };
 
-  const authorName = article.users?.display_name ||
-    `${article.users?.first_name || ''} ${article.users?.last_name || ''}`.trim() ||
+  const authorName = article.creches?.name ||
+    `${article.creches?.name || ''} ${article.users?.last_name || ''}`.trim() ||
     article.creches?.name ||
     'Anonymous';
 
-  const authorImage = article.users?.profile_picture_url ||
+  const authorImage = 
     article.creches?.logo ||
     'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg';
 

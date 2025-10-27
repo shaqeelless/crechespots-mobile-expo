@@ -57,6 +57,110 @@ const AnimatedText = Animated.createAnimatedComponent(Text);
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
+// Skeleton Loading Components
+const SkeletonLoader = () => {
+  return (
+    <AnimatedView entering={FadeIn.duration(600)}>
+      {/* Header Skeleton */}
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonMenuButton} />
+        <View style={styles.skeletonLogo} />
+        <View style={styles.skeletonNotificationButton} />
+      </View>
+      
+      <View style={styles.skeletonWelcome}>
+        <View style={styles.skeletonWelcomeLine} />
+        <View style={styles.skeletonLocationLine} />
+      </View>
+
+      {/* Quick Actions Skeleton */}
+      <View style={styles.skeletonQuickActions}>
+        {[1, 2, 3, 4].map((item) => (
+          <View key={item} style={styles.skeletonActionButton}>
+            <View style={styles.skeletonEmoji} />
+            <View style={styles.skeletonActionText} />
+          </View>
+        ))}
+      </View>
+
+      {/* Nearby Creches Section Skeleton */}
+      <View style={styles.skeletonSection}>
+        <View style={styles.skeletonSectionTitle} />
+        <View style={styles.skeletonSectionSubtitle} />
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.skeletonCrechesContainer}>
+            {[1, 2, 3].map((item) => (
+              <View key={item} style={styles.skeletonCrecheCard}>
+                <View style={styles.skeletonCrecheImage} />
+                <View style={styles.skeletonCrecheContent}>
+                  <View style={styles.skeletonCrecheName} />
+                  <View style={styles.skeletonCrecheInfo}>
+                    <View style={styles.skeletonRating} />
+                    <View style={styles.skeletonLocation} />
+                  </View>
+                  <View style={styles.skeletonPrice} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* Application Status Skeleton */}
+      <View style={styles.skeletonSection}>
+        <View style={styles.skeletonSectionTitle} />
+        {[1, 2].map((item) => (
+          <View key={item} style={styles.skeletonActivityItem}>
+            <View style={styles.skeletonActivityIcon} />
+            <View style={styles.skeletonActivityContent}>
+              <View style={styles.skeletonActivityTitle} />
+              <View style={styles.skeletonActivityDescription} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </AnimatedView>
+  );
+};
+
+// Animated Skeleton Component
+const AnimatedSkeleton = () => {
+  const translateX = useSharedValue(-width);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  useEffect(() => {
+    translateX.value = withRepeat(
+      withSequence(
+        withTiming(width, { duration: 1000 }),
+        withTiming(-width, { duration: 0 })
+      ),
+      -1
+    );
+  }, []);
+
+  return (
+    <AnimatedView
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+};
+
 // Floating Notification Badge
 const FloatingNotificationBadge = () => {
   const scale = useSharedValue(1);
@@ -432,122 +536,122 @@ export default function HomeScreen() {
           </AnimatedText>
         </AnimatedView>
 
-        {/* Quick Actions */}
-        <AnimatedView 
-          style={styles.quickActions}
-          entering={FadeInUp.delay(600).duration(800).springify()}
-        >
-          <AnimatedActionButton
-            emoji="🔍"
-            text="Find Creches"
-            backgroundColor="#f68484"
-            delay={700}
-            onPress={() => router.push('/search')}
-          />
-          
-          <AnimatedActionButton
-            emoji="👶"
-            text="My Children"
-            backgroundColor="#9cdcb8"
-            delay={800}
-            onPress={() => router.push('/children')}
-          />
-          
-          <AnimatedActionButton
-            emoji="📋"
-            text="Applications"
-            backgroundColor="#84a7f6"
-            delay={900}
-            onPress={() => router.push('/applications')}
-          />
-          
-          <AnimatedActionButton
-            emoji="📰"
-            text="Feeds"
-            backgroundColor="#f6cc84"
-            delay={1000}
-            onPress={() => router.push('/feeds')}
-          />
-        </AnimatedView>
+        {/* Show Skeleton Loader when loading */}
+        {loading && !refreshing ? (
+          <SkeletonLoader />
+        ) : (
+          <>
+            {/* Quick Actions */}
+            <AnimatedView 
+              style={styles.quickActions}
+              entering={FadeInUp.delay(600).duration(800).springify()}
+            >
+              <AnimatedActionButton
+                emoji="🔍"
+                text="Find Creches"
+                backgroundColor="#f68484"
+                delay={700}
+                onPress={() => router.push('/search')}
+              />
+              
+              <AnimatedActionButton
+                emoji="👶"
+                text="My Children"
+                backgroundColor="#9cdcb8"
+                delay={800}
+                onPress={() => router.push('/children')}
+              />
+              
+              <AnimatedActionButton
+                emoji="📋"
+                text="Applications"
+                backgroundColor="#84a7f6"
+                delay={900}
+                onPress={() => router.push('/applications')}
+              />
+              
+              <AnimatedActionButton
+                emoji="📰"
+                text="Feeds"
+                backgroundColor="#f6cc84"
+                delay={1000}
+                onPress={() => router.push('/feeds')}
+              />
+            </AnimatedView>
 
-        {/* Nearby Creches Section */}
-        <AnimatedView 
-          style={styles.section}
-          entering={FadeInUp.delay(1100).duration(800).springify()}
-        >
-          <Text style={styles.sectionTitle}>Nearby Creches</Text>
-          <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
-          
-          {error ? (
+            {/* Nearby Creches Section */}
             <AnimatedView 
-              style={styles.errorContainer}
-              entering={BounceIn.duration(800)}
+              style={styles.section}
+              entering={FadeInUp.delay(1100).duration(800).springify()}
             >
-              <Text style={styles.errorText}>{error}</Text>
-              <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </Pressable>
+              <Text style={styles.sectionTitle}>Nearby Creches</Text>
+              <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
+              
+              {error ? (
+                <AnimatedView 
+                  style={styles.errorContainer}
+                  entering={BounceIn.duration(800)}
+                >
+                  <Text style={styles.errorText}>{error}</Text>
+                  <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </Pressable>
+                </AnimatedView>
+              ) : creches.length > 0 ? (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.crechesScrollContent}
+                >
+                  <View style={styles.crechesContainer}>
+                    {creches.map((creche, index) => (
+                      <AnimatedCrecheCard
+                        key={creche.id}
+                        creche={creche}
+                        index={index}
+                        onPress={() => router.push(`/search/${creche.id}`)}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              ) : (
+                <AnimatedView 
+                  style={styles.emptyContainer}
+                  entering={BounceIn.duration(800)}
+                >
+                  <Text style={styles.emptyText}>No creches found in your area</Text>
+                  <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
+                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  </Pressable>
+                </AnimatedView>
+              )}
             </AnimatedView>
-          ) : loading ? (
-            <AnimatedView 
-              style={styles.loadingContainer}
-              entering={FadeIn.duration(600)}
-            >
-              <Text style={styles.loadingText}>Loading creches...</Text>
-            </AnimatedView>
-          ) : creches.length > 0 ? (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.crechesScrollContent}
-            >
-              <View style={styles.crechesContainer}>
-                {creches.map((creche, index) => (
-                  <AnimatedCrecheCard
-                    key={creche.id}
-                    creche={creche}
-                    index={index}
-                    onPress={() => router.push(`/search/${creche.id}`)}
-                  />
-                ))}
-              </View>
-            </ScrollView>
-          ) : (
-            <AnimatedView 
-              style={styles.emptyContainer}
-              entering={BounceIn.duration(800)}
-            >
-              <Text style={styles.emptyText}>No creches found in your area</Text>
-              <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
-              </Pressable>
-            </AnimatedView>
-          )}
-        </AnimatedView>
 
-        {/* Application Status */}
-        <AnimatedView 
-          style={styles.section}
-          entering={FadeInUp.delay(1200).duration(800).springify()}
-        >
-          <Text style={styles.sectionTitle}>Application Status</Text>
-          
-          <AnimatedActivityItem
-            icon={Clock}
-            title="Under Review"
-            description="2 applications are currently being reviewed by creches"
-            backgroundColor="#f59e0b"
-            delay={1300}
-          />
-          
-          <AnimatedActivityItem
-            icon={Users}
-            title="Application Accepted"
-            description="Sunshine Daycare accepted your application for Emma"
-            backgroundColor="#22c55e"
-            delay={1500}
-          />
-        </AnimatedView>
+            {/* Application Status */}
+            <AnimatedView 
+              style={styles.section}
+              entering={FadeInUp.delay(1200).duration(800).springify()}
+            >
+              <Text style={styles.sectionTitle}>Application Status</Text>
+              
+              <AnimatedActivityItem
+                icon={Clock}
+                title="Under Review"
+                description="2 applications are currently being reviewed by creches"
+                backgroundColor="#f59e0b"
+                delay={1300}
+              />
+              
+              <AnimatedActivityItem
+                icon={Users}
+                title="Application Accepted"
+                description="Sunshine Daycare accepted your application for Emma"
+                backgroundColor="#22c55e"
+                delay={1500}
+              />
+            </AnimatedView>
+          </>
+        )}
 
         {/* Bottom Padding */}
         <View style={styles.bottomPadding} />
@@ -557,21 +661,6 @@ export default function HomeScreen() {
     </>
   );
 }
-
-// Add these animation components
-const FadeInLeft = {
-  0: {
-    opacity: 0,
-    transform: [{ translateX: -50 }],
-  },
-  1: {
-    opacity: 1,
-    transform: [{ translateX: 0 }],
-  },
-};
-
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -750,14 +839,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#bd84f6',
   },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
   errorContainer: {
     paddingVertical: 40,
     alignItems: 'center',
@@ -824,5 +905,177 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
+  },
+  // Skeleton Loading Styles
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  skeletonMenuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonLogo: {
+    width: 200,
+    height: 60,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
+  },
+  skeletonNotificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonWelcome: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  skeletonWelcomeLine: {
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '60%',
+  },
+  skeletonLocationLine: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '40%',
+  },
+  skeletonQuickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+  skeletonActionButton: {
+    width: (width - 60) / 4,
+    height: 96,
+    borderRadius: 12,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skeletonEmoji: {
+    width: 28,
+    height: 28,
+    backgroundColor: '#d1d5db',
+    borderRadius: 14,
+    marginBottom: 8,
+  },
+  skeletonActionText: {
+    width: 40,
+    height: 12,
+    backgroundColor: '#d1d5db',
+    borderRadius: 4,
+  },
+  skeletonSection: {
+    marginTop: 32,
+    paddingHorizontal: 20,
+  },
+  skeletonSectionTitle: {
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '40%',
+  },
+  skeletonSectionSubtitle: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 16,
+    width: '60%',
+  },
+  skeletonCrechesContainer: {
+    flexDirection: 'row',
+  },
+  skeletonCrecheCard: {
+    width: 250,
+    marginRight: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  skeletonCrecheImage: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonCrecheContent: {
+    padding: 12,
+  },
+  skeletonCrecheName: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '80%',
+  },
+  skeletonCrecheInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  skeletonRating: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '30%',
+  },
+  skeletonLocation: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '40%',
+  },
+  skeletonPrice: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '50%',
+  },
+  skeletonActivityItem: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  skeletonActivityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+    marginRight: 12,
+  },
+  skeletonActivityContent: {
+    flex: 1,
+  },
+  skeletonActivityTitle: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '70%',
+  },
+  skeletonActivityDescription: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '90%',
   },
 });

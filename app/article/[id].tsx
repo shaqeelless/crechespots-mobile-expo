@@ -199,13 +199,10 @@ export default function ArticleDetailScreen() {
   }
 
   const authorName =
-    article.users?.display_name ||
-    `${article.users?.first_name || ''} ${article.users?.last_name || ''}`.trim() ||
     article.creches?.name ||
     'Anonymous';
 
   const authorImage =
-    article.users?.profile_picture_url ||
     article.creches?.logo ||
     'https://images.pexels.com/photos/8613073/pexels-photo-8613073.jpeg';
 
