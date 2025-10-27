@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Search, Heart, BookOpen, User } from 'lucide-react-native';
+import { Chrome as Home, Search, Baby, BookOpen, User } from 'lucide-react-native';
 import { useEffect } from 'react';
 import Animated, {
   useSharedValue,
@@ -286,7 +286,7 @@ export default function TabLayout() {
         options={{
           title: 'Child',
           tabBarIcon: ({ size, color, focused }) => (
-            <Heart size={size} color={color} />
+            <Baby size={size} color={color} />
           ),
         }}
       />

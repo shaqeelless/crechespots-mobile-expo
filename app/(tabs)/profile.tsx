@@ -77,12 +77,6 @@ export default function ProfileScreen() {
       onPress: () => router.push('/profile/edit'),
     },
     {
-      icon: Baby,
-      label: 'Manage Children',
-      color: '#9cdcb8',
-      onPress: () => router.push('/children'),
-    },
-    {
       icon: FileText,
       label: 'My Applications',
       color: '#84a7f6',
