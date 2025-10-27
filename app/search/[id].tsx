@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Share,
   Animated,
+  Dimensions,
+  FlatList,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -28,10 +30,14 @@ import {
   Instagram,
   MessageCircle,
   Send,
-  Heart
+  Heart,
+  ChevronRight,
+  ChevronLeft as LeftIcon,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+
+const { width } = Dimensions.get('window');
 
 interface Creche {
   id: string;
@@ -59,12 +65,28 @@ interface Creche {
   whatsapp_number: string;
 }
 
+interface GalleryImage {
+  id: string;
+  creche_id: string;
+  image_url: string;
+  caption: string;
+  order_index: number;
+  created_at: string;
+}
+
 // Skeleton Loading Component
 const SkeletonLoader = () => {
   return (
     <View style={styles.container}>
-      {/* Header Image Skeleton */}
-      <View style={styles.skeletonHeaderImage} />
+      {/* Gallery Skeleton */}
+      <View style={styles.skeletonGallery}>
+        <View style={styles.skeletonGalleryImage} />
+        <View style={styles.skeletonGalleryDots}>
+          <View style={styles.skeletonGalleryDot} />
+          <View style={styles.skeletonGalleryDot} />
+          <View style={styles.skeletonGalleryDot} />
+        </View>
+      </View>
       
       {/* Back Button Skeleton */}
       <View style={styles.skeletonBackButton} />
@@ -159,11 +181,112 @@ const SkeletonLoader = () => {
   );
 };
 
+// Gallery Component
+const GalleryView = ({ images }: { images: GalleryImage[] }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
+  const goToNext = () => {
+    if (currentIndex < images.length - 1) {
+      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
+    }
+  };
+
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      flatListRef.current?.scrollToIndex({ index: currentIndex - 1 });
+    }
+  };
+
+  if (images.length === 0) {
+    return (
+      <View style={styles.galleryContainer}>
+        <Image
+          source={{ uri: 'https://crechespots.org.za/wp-content/uploads/2024/08/Header_template.png' }}
+          style={styles.galleryImage}
+          resizeMode="cover"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.galleryContainer}>
+      <FlatList
+        ref={flatListRef}
+        data={images}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.gallerySlide}>
+            <Image
+              source={{ uri: item.image_url }}
+              style={styles.galleryImage}
+              resizeMode="cover"
+            />
+            {item.caption && (
+              <View style={styles.imageCaption}>
+                <Text style={styles.captionText}>{item.caption}</Text>
+              </View>
+            )}
+          </View>
+        )}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+      />
+
+      {/* Navigation Arrows */}
+      {images.length > 1 && (
+        <>
+          {currentIndex > 0 && (
+            <Pressable style={[styles.navArrow, styles.leftArrow]} onPress={goToPrevious}>
+              <LeftIcon size={24} color="#fff" />
+            </Pressable>
+          )}
+          {currentIndex < images.length - 1 && (
+            <Pressable style={[styles.navArrow, styles.rightArrow]} onPress={goToNext}>
+              <ChevronRight size={24} color="#fff" />
+            </Pressable>
+          )}
+        </>
+      )}
+
+      {/* Dots Indicator */}
+      {images.length > 1 && (
+        <View style={styles.dotsContainer}>
+          {images.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                currentIndex === index && styles.activeDot,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function CrecheDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const [creche, setCreche] = useState<Creche | null>(null);
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -174,6 +297,7 @@ export default function CrecheDetailScreen() {
 
   useEffect(() => {
     fetchCrecheDetails();
+    fetchGalleryImages();
     if (user) {
       checkIfFavorite();
     }
@@ -194,8 +318,6 @@ export default function CrecheDetailScreen() {
   const fetchCrecheDetails = async () => {
     try {
       setLoading(true);
-      // Simulate loading delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 1500));
       
       const { data, error } = await supabase
         .from('creches')
@@ -211,6 +333,25 @@ export default function CrecheDetailScreen() {
     } catch (err) {
       console.error('Error fetching creche details:', err);
       setError('Failed to load creche details');
+    }
+  };
+
+  const fetchGalleryImages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('creche_gallery')
+        .select('*')
+        .eq('creche_id', id)
+        .order('order_index', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching gallery images:', error);
+        return;
+      }
+
+      setGalleryImages(data || []);
+    } catch (err) {
+      console.error('Error fetching gallery images:', err);
     } finally {
       setLoading(false);
     }
@@ -324,12 +465,8 @@ export default function CrecheDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Image */}
-      <Image
-        source={{ uri: creche.header_image || 'https://crechespots.org.za/wp-content/uploads/2024/08/Header_template.png' }}
-        style={styles.headerImage}
-        resizeMode="cover"
-      />
+      {/* Gallery */}
+      <GalleryView images={galleryImages} />
 
       {/* Animated Header Background */}
       <Animated.View 
@@ -407,6 +544,16 @@ export default function CrecheDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
             <Text style={styles.description}>{creche.description}</Text>
+          </View>
+        )}
+
+        {/* Gallery Info */}
+        {galleryImages.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Gallery ({galleryImages.length})</Text>
+            <Text style={styles.gallerySubtitle}>
+              View {galleryImages.length} photo{galleryImages.length !== 1 ? 's' : ''} of this creche
+            </Text>
           </View>
         )}
 
@@ -561,16 +708,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  headerImage: {
+  // Gallery Styles
+  galleryContainer: {
     width: '100%',
-    height: 250,
+    height: 300,
+    position: 'relative',
+  },
+  gallerySlide: {
+    width: width,
+    height: 300,
+    position: 'relative',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageCaption: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 12,
+  },
+  captionText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  navArrow: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  leftArrow: {
+    left: 10,
+  },
+  rightArrow: {
+    right: 10,
+  },
+  dotsContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  activeDot: {
+    backgroundColor: '#fff',
+    width: 12,
+  },
+  gallerySubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
   },
   animatedHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 100,
+
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
@@ -838,10 +1052,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Skeleton Loading Styles
-  skeletonHeaderImage: {
+  skeletonGallery: {
     width: '100%',
-    height: 250,
+    height: 300,
     backgroundColor: '#e5e7eb',
+    position: 'relative',
+  },
+  skeletonGalleryImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#d1d5db',
+  },
+  skeletonGalleryDots: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  skeletonGalleryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#9ca3af',
   },
   skeletonBackButton: {
     position: 'absolute',

@@ -8,11 +8,20 @@ import {
   Pressable,
   Alert,
   Image,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, User, Phone, Mail, MessageCircle, Baby, MapPin } from 'lucide-react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  ZoomIn,
+} from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+
+const { width } = Dimensions.get('window');
 
 interface Child {
   id: string;
@@ -28,6 +37,122 @@ interface Creche {
   header_image: string;
   address: string;
 }
+
+// Animated Components
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const AnimatedView = Animated.createAnimatedComponent(View);
+const AnimatedText = Animated.createAnimatedComponent(Text);
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+// Skeleton Loading Components
+const SkeletonLoader = () => {
+  return (
+    <AnimatedView entering={FadeIn.duration(600)} style={styles.container}>
+      {/* Header Skeleton */}
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonBackButton} />
+        <View style={styles.skeletonHeaderTitle} />
+        <View style={styles.skeletonPlaceholder} />
+      </View>
+
+      <ScrollView style={styles.content}>
+        {/* Creche Info Skeleton */}
+        <View style={styles.skeletonCrecheSection}>
+          <View style={styles.skeletonCrecheImage} />
+          <View style={styles.skeletonCrecheInfo}>
+            <View style={styles.skeletonCrecheName} />
+            <View style={styles.skeletonCrecheAddress} />
+          </View>
+        </View>
+
+        {/* Child Selection Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonChildrenContainer}>
+            {[1, 2].map((item) => (
+              <View key={item} style={styles.skeletonChildOption}>
+                <View style={styles.skeletonChildAvatar} />
+                <View style={styles.skeletonChildDetails}>
+                  <View style={styles.skeletonChildName} />
+                  <View style={styles.skeletonChildAge} />
+                </View>
+                <View style={styles.skeletonRadioButton} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Parent Information Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonInfoDisplay}>
+            {[1, 2, 3, 4].map((item) => (
+              <View key={item} style={styles.skeletonInfoRow}>
+                <View style={styles.skeletonInfoIcon} />
+                <View style={styles.skeletonInfoLabel} />
+                <View style={styles.skeletonInfoValue} />
+              </View>
+            ))}
+          </View>
+          <View style={styles.skeletonEditProfileButton} />
+        </View>
+
+        {/* Message Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonMessageContainer}>
+            <View style={styles.skeletonMessageIcon} />
+            <View style={styles.skeletonMessageInput} />
+          </View>
+        </View>
+
+        {/* Submit Button Skeleton */}
+        <View style={styles.skeletonSubmitSection}>
+          <View style={styles.skeletonSubmitButton} />
+          <View style={styles.skeletonDisclaimer} />
+        </View>
+      </ScrollView>
+    </AnimatedView>
+  );
+};
+
+// Animated Skeleton Component
+const AnimatedSkeleton = () => {
+  const translateX = useSharedValue(-width);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  useEffect(() => {
+    translateX.value = withRepeat(
+      withSequence(
+        withTiming(width, { duration: 1000 }),
+        withTiming(-width, { duration: 0 })
+      ),
+      -1
+    );
+  }, []);
+
+  return (
+    <AnimatedView
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+};
 
 export default function ApplyScreen() {
   const { id } = useLocalSearchParams();
@@ -157,11 +282,7 @@ export default function ApplyScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.loadingText}>Loading application form...</Text>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   if (!creche) {
@@ -178,37 +299,59 @@ export default function ApplyScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+      <AnimatedView 
+        style={styles.header}
+        entering={FadeInDown.duration(600).springify()}
+      >
+        <AnimatedPressable 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+          entering={ZoomIn.duration(600).springify()}
+        >
           <ArrowLeft size={24} color="#374151" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Apply to Creche</Text>
+        </AnimatedPressable>
+        <AnimatedText 
+          style={styles.headerTitle}
+          entering={FadeInUp.delay(200).duration(600).springify()}
+        >
+          Apply to Creche
+        </AnimatedText>
         <View style={styles.placeholder} />
-      </View>
+      </AnimatedView>
 
-      <ScrollView style={styles.content}>
+      <AnimatedScrollView 
+        style={styles.content}
+        entering={FadeIn.delay(300).duration(600)}
+      >
         {/* Creche Info */}
-        <View style={styles.crecheSection}>
+        <AnimatedView 
+          style={styles.crecheSection}
+          entering={FadeInUp.delay(400).duration(600).springify()}
+        >
           <Image source={{ uri: creche.header_image }} style={styles.crecheImage} />
           <View style={styles.crecheInfo}>
             <Text style={styles.crecheName}>{creche.name}</Text>
             <Text style={styles.crecheAddress}>{creche.address}</Text>
           </View>
-        </View>
+        </AnimatedView>
 
         {/* Child Selection */}
-        <View style={styles.section}>
+        <AnimatedView 
+          style={styles.section}
+          entering={FadeInUp.delay(500).duration(600).springify()}
+        >
           <Text style={styles.sectionTitle}>Select Child</Text>
           {children.length > 0 ? (
             <View style={styles.childrenContainer}>
-              {children.map((child) => (
-                <Pressable
+              {children.map((child, index) => (
+                <AnimatedPressable
                   key={child.id}
                   style={[
                     styles.childOption,
                     selectedChild === child.id && styles.selectedChildOption,
                   ]}
                   onPress={() => setSelectedChild(child.id)}
+                  entering={FadeInLeft.delay(600 + index * 100).duration(600).springify()}
                 >
                   <View style={styles.childAvatar}>
                     <Text style={styles.childAvatarText}>
@@ -227,11 +370,14 @@ export default function ApplyScreen() {
                     styles.radioButton,
                     selectedChild === child.id && styles.selectedRadioButton,
                   ]} />
-                </Pressable>
+                </AnimatedPressable>
               ))}
             </View>
           ) : (
-            <View style={styles.noChildrenContainer}>
+            <AnimatedView 
+              style={styles.noChildrenContainer}
+              entering={FadeInUp.delay(600).duration(600).springify()}
+            >
               <Baby size={32} color="#9ca3af" />
               <Text style={styles.noChildrenText}>No children profiles found</Text>
               <Pressable 
@@ -240,12 +386,15 @@ export default function ApplyScreen() {
               >
                 <Text style={styles.addChildButtonText}>Add Child Profile</Text>
               </Pressable>
-            </View>
+            </AnimatedView>
           )}
-        </View>
+        </AnimatedView>
 
         {/* Parent Information */}
-        <View style={styles.section}>
+        <AnimatedView 
+          style={styles.section}
+          entering={FadeInUp.delay(700).duration(600).springify()}
+        >
           <Text style={styles.sectionTitle}>Parent Information (From Your Profile)</Text>
           
           <View style={styles.infoDisplay}>
@@ -288,10 +437,13 @@ export default function ApplyScreen() {
           >
             <Text style={styles.editProfileText}>Edit Profile Information</Text>
           </Pressable>
-        </View>
+        </AnimatedView>
 
         {/* Message */}
-        <View style={styles.section}>
+        <AnimatedView 
+          style={styles.section}
+          entering={FadeInUp.delay(800).duration(600).springify()}
+        >
           <Text style={styles.sectionTitle}>Message to Creche</Text>
           <View style={styles.messageContainer}>
             <MessageCircle size={20} color="#9ca3af" />
@@ -305,10 +457,13 @@ export default function ApplyScreen() {
               textAlignVertical="top"
             />
           </View>
-        </View>
+        </AnimatedView>
 
         {/* Submit Button */}
-        <View style={styles.submitSection}>
+        <AnimatedView 
+          style={styles.submitSection}
+          entering={FadeInUp.delay(900).duration(600).springify()}
+        >
           <Pressable 
             style={[styles.submitButton, submitting && styles.disabledButton]}
             onPress={handleSubmit}
@@ -323,11 +478,23 @@ export default function ApplyScreen() {
             By submitting this application, you agree to share your contact information 
             with the creche for communication purposes.
           </Text>
-        </View>
-      </ScrollView>
+        </AnimatedView>
+      </AnimatedScrollView>
     </View>
   );
 }
+
+// Custom animation
+const FadeInLeft = {
+  0: {
+    opacity: 0,
+    transform: [{ translateX: -50 }],
+  },
+  1: {
+    opacity: 1,
+    transform: [{ translateX: 0 }],
+  },
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -479,23 +646,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  input: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#374151',
-  },
   messageContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -575,10 +725,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
   errorText: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -588,5 +734,191 @@ const styles = StyleSheet.create({
   backText: {
     color: '#374151',
     fontWeight: '600',
+  },
+  // Skeleton Loading Styles
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: '#ffffff',
+  },
+  skeletonBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonHeaderTitle: {
+    width: 150,
+    height: 24,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  skeletonPlaceholder: {
+    width: 40,
+  },
+  skeletonCrecheSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 20,
+    marginBottom: 16,
+  },
+  skeletonCrecheImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonCrecheInfo: {
+    flex: 1,
+  },
+  skeletonCrecheName: {
+    height: 18,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '70%',
+  },
+  skeletonCrecheAddress: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '50%',
+  },
+  skeletonSection: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    marginBottom: 16,
+  },
+  skeletonSectionTitle: {
+    height: 18,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 16,
+    width: '60%',
+  },
+  skeletonChildrenContainer: {
+    gap: 12,
+  },
+  skeletonChildOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+  },
+  skeletonChildAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+    marginRight: 12,
+  },
+  skeletonChildDetails: {
+    flex: 1,
+  },
+  skeletonChildName: {
+    height: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '60%',
+  },
+  skeletonChildAge: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    width: '40%',
+  },
+  skeletonRadioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonInfoDisplay: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  skeletonInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  skeletonInfoIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonInfoLabel: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginLeft: 8,
+    width: 60,
+  },
+  skeletonInfoValue: {
+    height: 14,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    flex: 1,
+    marginLeft: 8,
+  },
+  skeletonEditProfileButton: {
+    backgroundColor: '#e5e7eb',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    width: 120,
+    height: 28,
+  },
+  skeletonMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  skeletonMessageIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonMessageInput: {
+    flex: 1,
+    marginLeft: 12,
+    height: 80,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
+  },
+  skeletonSubmitSection: {
+    padding: 20,
+  },
+  skeletonSubmitButton: {
+    backgroundColor: '#e5e7eb',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    height: 56,
+  },
+  skeletonDisclaimer: {
+    height: 36,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
   },
 });
