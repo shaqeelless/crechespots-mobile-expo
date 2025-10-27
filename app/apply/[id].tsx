@@ -17,6 +17,11 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   ZoomIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -154,6 +159,65 @@ const AnimatedSkeleton = () => {
   );
 };
 
+// Custom child component with built-in animation
+const AnimatedChildOption = ({ 
+  child, 
+  index, 
+  isSelected, 
+  onPress 
+}: { 
+  child: Child;
+  index: number;
+  isSelected: boolean;
+  onPress: () => void;
+}) => {
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  return (
+    <AnimatedPressable
+      style={[
+        styles.childOption,
+        isSelected && styles.selectedChildOption,
+      ]}
+      onPress={onPress}
+      entering={FadeInUp.delay(600 + index * 100).duration(400).springify()}
+    >
+      <View style={styles.childAvatar}>
+        <Text style={styles.childAvatarText}>
+          {getInitials(child.first_name, child.last_name)}
+        </Text>
+      </View>
+      <View style={styles.childDetails}>
+        <Text style={styles.childName}>
+          {child.first_name} {child.last_name}
+        </Text>
+        <Text style={styles.childAge}>
+          {calculateAge(child.date_of_birth)} years old • {child.gender}
+        </Text>
+      </View>
+      <View style={[
+        styles.radioButton,
+        isSelected && styles.selectedRadioButton,
+      ]} />
+    </AnimatedPressable>
+  );
+};
+
 export default function ApplyScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -264,23 +328,6 @@ export default function ApplyScreen() {
     }
   };
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
   if (loading) {
     return <SkeletonLoader />;
   }
@@ -344,33 +391,13 @@ export default function ApplyScreen() {
           {children.length > 0 ? (
             <View style={styles.childrenContainer}>
               {children.map((child, index) => (
-                <AnimatedPressable
+                <AnimatedChildOption
                   key={child.id}
-                  style={[
-                    styles.childOption,
-                    selectedChild === child.id && styles.selectedChildOption,
-                  ]}
+                  child={child}
+                  index={index}
+                  isSelected={selectedChild === child.id}
                   onPress={() => setSelectedChild(child.id)}
-                  entering={FadeInLeft.delay(600 + index * 100).duration(600).springify()}
-                >
-                  <View style={styles.childAvatar}>
-                    <Text style={styles.childAvatarText}>
-                      {getInitials(child.first_name, child.last_name)}
-                    </Text>
-                  </View>
-                  <View style={styles.childDetails}>
-                    <Text style={styles.childName}>
-                      {child.first_name} {child.last_name}
-                    </Text>
-                    <Text style={styles.childAge}>
-                      {calculateAge(child.date_of_birth)} years old • {child.gender}
-                    </Text>
-                  </View>
-                  <View style={[
-                    styles.radioButton,
-                    selectedChild === child.id && styles.selectedRadioButton,
-                  ]} />
-                </AnimatedPressable>
+                />
               ))}
             </View>
           ) : (
@@ -483,18 +510,6 @@ export default function ApplyScreen() {
     </View>
   );
 }
-
-// Custom animation
-const FadeInLeft = {
-  0: {
-    opacity: 0,
-    transform: [{ translateX: -50 }],
-  },
-  1: {
-    opacity: 1,
-    transform: [{ translateX: 0 }],
-  },
-};
 
 const styles = StyleSheet.create({
   container: {
