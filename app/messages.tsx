@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
   },
   emptyState: {
     alignItems: 'center',

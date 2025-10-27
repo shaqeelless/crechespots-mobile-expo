@@ -165,7 +165,7 @@ export default function EditProfileScreen() {
           onPress={handleSave}
           disabled={loading}
         >
-          <Save size={20} color="#bd4ab5" />
+          <Save size={20} color="#bd84f6" />
         </Pressable>
       </View>
 
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -378,10 +378,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
   },
   changePhotoText: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   submitButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   retryButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

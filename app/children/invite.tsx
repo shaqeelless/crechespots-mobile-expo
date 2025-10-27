@@ -175,7 +175,7 @@ export default function InviteParentScreen() {
       <ScrollView style={styles.content}>
         <View style={styles.infoSection}>
           <View style={styles.iconContainer}>
-            <Users size={48} color="#bd4ab5" />
+            <Users size={48} color="#bd84f6" />
           </View>
           <Text style={styles.infoTitle}>Link Another Parent</Text>
           <Text style={styles.infoDescription}>
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   submitButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

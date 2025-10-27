@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   selectedChildOption: {
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
     backgroundColor: '#fdf2f8',
   },
   childAvatar: {
@@ -455,8 +455,8 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
   },
   selectedRadioButton: {
-    borderColor: '#bd4ab5',
-    backgroundColor: '#bd4ab5',
+    borderColor: '#bd84f6',
+    backgroundColor: '#bd84f6',
   },
   noChildrenContainer: {
     alignItems: 'center',
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addChildButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   editProfileButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   submitButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

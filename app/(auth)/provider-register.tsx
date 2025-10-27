@@ -309,11 +309,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   link: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontWeight: '600',
   },
   submitButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   loginLink: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontWeight: '600',
   },
 });

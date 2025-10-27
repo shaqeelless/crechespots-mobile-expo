@@ -463,21 +463,21 @@ export default function CrecheDetailScreen() {
           
           {creche.phone_number && (
             <Pressable style={styles.contactRow} onPress={() => handleCall(creche.phone_number)}>
-              <Phone size={20} color="#bd4ab5" />
+              <Phone size={20} color="#bd84f6" />
               <Text style={styles.contactText}>{creche.phone_number}</Text>
             </Pressable>
           )}
 
           {creche.email && (
             <Pressable style={styles.contactRow} onPress={() => handleEmail(creche.email)}>
-              <Mail size={20} color="#bd4ab5" />
+              <Mail size={20} color="#bd84f6" />
               <Text style={styles.contactText}>{creche.email}</Text>
             </Pressable>
           )}
 
           {creche.website && (
             <Pressable style={styles.contactRow} onPress={() => handleWebsite(creche.website)}>
-              <Globe size={20} color="#bd4ab5" />
+              <Globe size={20} color="#bd84f6" />
               <Text style={styles.contactText}>Visit Website</Text>
             </Pressable>
           )}
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#bd4ab5',
+    color: '#bd84f6',
   },
   capacity: {
     flexDirection: 'row',
@@ -774,8 +774,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   favoriteButtonActive: {
-    backgroundColor: '#bd4ab5',
-    borderColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
+    borderColor: '#bd84f6',
   },
   favoriteButtonText: {
     fontSize: 16,
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     flex: 2,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -823,7 +823,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

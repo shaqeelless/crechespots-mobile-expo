@@ -208,14 +208,14 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   forgotPassword: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'right',
     marginTop: 8,
   },
   loginButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   registerLink: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontWeight: '600',
   },
 });

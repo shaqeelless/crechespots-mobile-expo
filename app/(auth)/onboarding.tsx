@@ -194,7 +194,7 @@ export default function OnboardingScreen() {
             style={[
               styles.dot,
               {
-                backgroundColor: index === currentIndex ? '#bd4ab5' : '#3a5dc4',
+                backgroundColor: index === currentIndex ? '#bd84f6' : '#3a5dc4',
                 width: index === currentIndex ? 24 : 8,
               },
             ]}
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   nextButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

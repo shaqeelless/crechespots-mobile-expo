@@ -416,7 +416,7 @@ export default function SearchScreen() {
           style={[styles.filterButton, showFilters && styles.activeFilterButton]}
           onPress={() => setShowFilters(!showFilters)}
         >
-          <SlidersHorizontal size={20} color={showFilters ? "#ffffff" : "#bd4ab5"} />
+          <SlidersHorizontal size={20} color={showFilters ? "#ffffff" : "#bd84f6"} />
         </Pressable>
       </View>
 
@@ -489,7 +489,7 @@ export default function SearchScreen() {
           </Text>
           <Pressable style={styles.sortButton}>
             <Text style={styles.sortText}>Sort by Distance</Text>
-            <Filter size={16} color="#bd4ab5" />
+            <Filter size={16} color="#bd84f6" />
           </Pressable>
         </View>
         
@@ -581,10 +581,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
   },
   activeFilterButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
   },
   filtersWrapper: {
     backgroundColor: '#ffffff',
@@ -612,8 +612,8 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   activeFilter: {
-    backgroundColor: '#bd4ab5',
-    borderColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
+    borderColor: '#bd84f6',
   },
   filterText: {
     fontSize: 14,
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
   },
   sortText: {
     fontSize: 14,
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontWeight: '500',
   },
   results: {
@@ -684,13 +684,13 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   favoriteButtonActive: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
   },
   savedBadge: {
     position: 'absolute',
     top: 12,
     left: 12,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#bd4ab5',
+    color: '#bd84f6',
     marginBottom: 2,
   },
   availability: {
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   applyButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     borderRadius: 8,
   },
   clearFiltersText: {

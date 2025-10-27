@@ -41,7 +41,7 @@ export default function SupportScreen() {
       title: 'Billing & Payments',
       description: 'Questions about charges, refunds, and payment methods',
       icon: FileText,
-      color: '#bd4ab5',
+      color: '#bd84f6',
     },
     {
       id: 'account',
@@ -112,7 +112,7 @@ export default function SupportScreen() {
       description: 'Call our support line',
       availability: 'Mon-Fri, 9AM-5PM EST',
       action: () => handlePhoneSupport(),
-      color: '#bd4ab5',
+      color: '#bd84f6',
     },
   ];
 
@@ -182,7 +182,7 @@ export default function SupportScreen() {
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <View style={styles.welcomeIcon}>
-            <HelpCircle size={32} color="#bd4ab5" />
+            <HelpCircle size={32} color="#bd84f6" />
           </View>
           <Text style={styles.welcomeTitle}>How can we help you?</Text>
           <Text style={styles.welcomeDescription}>
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   },
   activeCategoryCard: {
     backgroundColor: '#fdf2f8',
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
   },
   categoryIcon: {
     width: 48,
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 8,
     marginTop: 8,

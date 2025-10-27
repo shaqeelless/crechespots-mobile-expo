@@ -53,9 +53,9 @@ const FloatingBackground = ({ activeIndex }) => {
           left: 0, // Start from the left edge of the tab bar
           width: TAB_WIDTH, // Match individual tab width
           height: 65,
-          backgroundColor: '#bd4ab5',
+          backgroundColor: '#bd84f6',
           borderRadius: 16,
-          shadowColor: '#bd4ab5',
+          shadowColor: '#bd84f6',
           shadowOffset: {
             width: 0,
             height: 10,
@@ -340,7 +340,7 @@ export function DebugTabLayout() {
           paddingBottom: 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#bd4ab5',
+        tabBarActiveTintColor: '#bd84f6',
         tabBarInactiveTintColor: '#9ca3af',
         tabBarLabelStyle: {
           fontSize: 11,
@@ -419,7 +419,7 @@ const DebugFloatingIcon = ({ focused, children, index }) => {
         { translateY: translateY.value },
         { scale: scale.value }
       ],
-      backgroundColor: focused ? '#bd4ab5' : 'transparent',
+      backgroundColor: focused ? '#bd84f6' : 'transparent',
       padding: focused ? 8 : 0,
       borderRadius: focused ? 20 : 0,
     };

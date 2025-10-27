@@ -567,7 +567,7 @@ export default function ChildDetailsScreen() {
           {editing ? (
             <X size={20} color="#ef4444" />
           ) : (
-            <Edit3 size={20} color="#bd4ab5" />
+            <Edit3 size={20} color="#bd84f6" />
           )}
         </Pressable>
       </View>
@@ -726,7 +726,7 @@ export default function ChildDetailsScreen() {
               style={styles.inviteButton}
               onPress={() => setShowInviteForm(!showInviteForm)}
             >
-              <Plus size={16} color="#bd4ab5" />
+              <Plus size={16} color="#bd84f6" />
               <Text style={styles.inviteButtonText}>Invite Parent</Text>
             </Pressable>
           </View>
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1011,10 +1011,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fdf2f8',
     borderWidth: 1,
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
   },
   inviteButtonText: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1065,7 +1065,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
   },
   primaryButtonText: {
     color: '#ffffff',
@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1161,7 +1161,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   submitButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   retryButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

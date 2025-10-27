@@ -379,8 +379,8 @@ export default function HomeScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
-            colors={['#bd4ab5']}
-            tintColor={'#bd4ab5'}
+            colors={['#bd84f6']}
+            tintColor={'#bd84f6'}
           />
         }
       >
@@ -748,7 +748,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontWeight: 'bold',
-    color: '#bd4ab5',
+    color: '#bd84f6',
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

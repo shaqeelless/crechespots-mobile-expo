@@ -168,7 +168,7 @@ export default function BillingHistoryScreen() {
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#bd4ab5" />
+          <ActivityIndicator size="large" color="#bd84f6" />
           <Text style={styles.loadingText}>Loading billing history...</Text>
         </View>
       </View>
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   },
   activeFilterTab: {
     backgroundColor: '#fdf2f8',
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
   },
   filterTabText: {
     fontSize: 14,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   activeFilterTabText: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
   },
   section: {
     backgroundColor: '#ffffff',
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   summaryNumber: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#bd4ab5',
+    color: '#bd84f6',
     marginBottom: 4,
   },
   summaryLabel: {

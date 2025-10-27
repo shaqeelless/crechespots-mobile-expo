@@ -25,7 +25,7 @@ export default function BillingScreen() {
       description: 'Manage your credit cards and payment options',
       icon: CreditCard,
       route: '/billing/payment-methods',
-      color: '#bd4ab5',
+      color: '#bd84f6',
     },
     {
       title: 'Billing History',
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#bd4ab5',
+    color: '#bd84f6',
     marginBottom: 4,
   },
   statLabel: {

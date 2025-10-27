@@ -125,7 +125,7 @@ export default function ChildrenScreen() {
           router.push(`/children/${child.id}/edit`);
         }}
       >
-        <Edit3 size={16} color="#bd4ab5" />
+        <Edit3 size={16} color="#bd84f6" />
       </Pressable>
     </Pressable>
   );
@@ -142,7 +142,7 @@ export default function ChildrenScreen() {
           style={styles.addButton}
           onPress={() => router.push('/children/add')}
         >
-          <Plus size={24} color="#bd4ab5" />
+          <Plus size={24} color="#bd84f6" />
         </Pressable>
       </View>
 
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   addFirstChildButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,

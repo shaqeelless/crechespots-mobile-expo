@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedGenderOption: {
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
     backgroundColor: '#fdf2f8',
   },
   genderOptionText: {
@@ -459,14 +459,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   selectedGenderOptionText: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontWeight: '600',
   },
   submitSection: {
     paddingBottom: 40,
   },
   submitButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

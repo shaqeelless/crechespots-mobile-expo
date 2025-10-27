@@ -642,7 +642,7 @@ export default function FeedsScreen() {
               )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.addIconButton} onPress={() => setShowAddCreche(true)}>
-              <Plus size={24} color="#2563eb" />
+              <Plus size={24} color="#bd84f6" />
             </TouchableOpacity>
           </View>
         </View>
@@ -736,7 +736,7 @@ export default function FeedsScreen() {
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2563eb" />
+            <ActivityIndicator size="large" color="#bd84f6" />
             <Text style={styles.loadingText}>Loading your feeds...</Text>
           </View>
         ) : articles.length > 0 ? (
@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#bd84f6',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#2563eb',
+    color: '#bd84f6',
     fontWeight: '600',
   },
   // Tabs
@@ -887,8 +887,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectedTab: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
+    backgroundColor: '#bd84f6',
+    borderColor: '#bd84f6',
   },
   crecheTabContent: {
     alignItems: 'center',
@@ -942,7 +942,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   activeFilterText: {
-    color: '#2563eb',
+    color: '#bd84f6',
     fontWeight: '600',
   },
   content: {
@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   favoriteItem: {
-    borderColor: '#2563eb',
+    borderColor: '#bd84f6',
     backgroundColor: '#eff6ff',
   },
   crecheItemLogo: {
@@ -1033,13 +1033,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2563eb',
+    borderColor: '#bd84f6',
   },
   favoriteButtonActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#bd84f6',
   },
   favoriteButtonText: {
-    color: '#2563eb',
+    color: '#bd84f6',
     fontWeight: '600',
     fontSize: 14,
   },
@@ -1075,7 +1075,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -1087,7 +1087,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   exploreButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,

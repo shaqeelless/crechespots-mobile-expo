@@ -276,7 +276,7 @@ export default function PaymentMethodsScreen() {
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#bd4ab5" />
+          <ActivityIndicator size="large" color="#bd84f6" />
           <Text style={styles.loadingText}>Loading payment methods...</Text>
         </View>
       </View>
@@ -301,7 +301,7 @@ export default function PaymentMethodsScreen() {
           onPress={() => setShowAddModal(true)}
         >
           <View style={styles.addCardContent}>
-            <Plus size={24} color="#bd4ab5" />
+            <Plus size={24} color="#bd84f6" />
             <Text style={styles.addCardText}>Add New Card</Text>
           </View>
         </Pressable>
@@ -324,7 +324,7 @@ export default function PaymentMethodsScreen() {
                 <View style={styles.cardHeader}>
                   <View style={styles.cardInfo}>
                     <View style={styles.cardIcon}>
-                      <CreditCard size={20} color="#bd4ab5" />
+                      <CreditCard size={20} color="#bd84f6" />
                     </View>
                     <View style={styles.cardDetails}>
                       <Text style={styles.cardType}>{method.card_type}</Text>
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
     borderStyle: 'dashed',
   },
   addCardContent: {
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   addCardText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#bd4ab5',
+    color: '#bd84f6',
   },
   section: {
     backgroundColor: '#ffffff',
@@ -781,8 +781,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   checkboxChecked: {
-    backgroundColor: '#bd4ab5',
-    borderColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
+    borderColor: '#bd84f6',
   },
   checkboxLabel: {
     fontSize: 14,
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 16,
     borderRadius: 12,
     marginBottom: 40,

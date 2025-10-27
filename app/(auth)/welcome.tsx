@@ -92,7 +92,7 @@ export default function WelcomeScreen() {
           onPress={() => router.push('/(auth)/provider-register')}
         >
           <Text style={styles.providerButtonText}>I'm a Childcare Provider</Text>
-          <ArrowRight size={20} color="#bd4ab5" />
+          <ArrowRight size={20} color="#bd84f6" />
         </Pressable>
 
         <Pressable onPress={() => router.push('/(auth)/login')}>
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
   },
   parentButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -220,11 +220,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
     marginBottom: 24,
   },
   providerButtonText: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontSize: 16,
     fontWeight: '600',
     marginRight: 8,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   loginLink: {
-    color: '#bd4ab5',
+    color: '#bd84f6',
     fontWeight: '600',
   },
 });

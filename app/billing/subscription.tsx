@@ -214,7 +214,7 @@ export default function SubscriptionScreen() {
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#bd4ab5" />
+          <ActivityIndicator size="large" color="#bd84f6" />
           <Text style={styles.loadingText}>Loading subscription...</Text>
         </View>
       </View>
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
   },
   currentSubscriptionHeader: {
     flexDirection: 'row',
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fffbeb',
   },
   selectedPlanCard: {
-    borderColor: '#bd4ab5',
+    borderColor: '#bd84f6',
     backgroundColor: '#fdf2f8',
   },
   popularBadge: {
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   subscribeButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',

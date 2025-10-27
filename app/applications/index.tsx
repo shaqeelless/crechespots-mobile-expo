@@ -276,8 +276,8 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   activeFilterTab: {
-    backgroundColor: '#bd4ab5',
-    borderColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
+    borderColor: '#bd84f6',
   },
   filterTabText: {
     fontSize: 14,
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   exploreButton: {
-    backgroundColor: '#bd4ab5',
+    backgroundColor: '#bd84f6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
