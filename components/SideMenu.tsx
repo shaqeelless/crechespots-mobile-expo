@@ -56,10 +56,10 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
   const menuItems = [
     { icon: MapPin, label: 'Saved Locations', color: '#f6cc84', route: '/favorites' },
-    { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6', route: '/(tabs)/payment-methods' },
-    { icon: Settings, label: 'Settings', color: '#f684a3', route: '/(tabs)/settings' },
-    { icon: CircleHelp, label: 'Help & Support', color: '#9cdcb8', route: '/(tabs)/help-support' },
-    { icon: Shield, label: 'Safety Center', color: '#84a7f6', route: '/(tabs)/safety-center' },
+    { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6', route: '/payment-methods' },
+    { icon: Settings, label: 'Settings', color: '#f684a3', route: '/settings' },
+    { icon: CircleHelp, label: 'Help & Support', color: '#9cdcb8', route: '/help-support' },
+    { icon: Shield, label: 'Safety Center', color: '#84a7f6', route: '/safety-centre' },
   ];
 
   return (
