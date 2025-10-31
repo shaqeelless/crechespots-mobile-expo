@@ -300,9 +300,6 @@ export default function ChildrenScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#374151" />
-        </Pressable>
         <Text style={styles.title}>My Children</Text>
         <Pressable 
           style={styles.addButton}

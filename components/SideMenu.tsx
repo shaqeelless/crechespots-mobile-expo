@@ -55,7 +55,6 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
   };
 
   const menuItems = [
-    { icon: User, label: 'Profile', color: '#f68484', route: '/(tabs)/profile' },
     { icon: MapPin, label: 'Saved Locations', color: '#f6cc84', route: '/favorites' },
     { icon: CreditCard, label: 'Payment Methods', color: '#bd84f6', route: '/(tabs)/payment-methods' },
     { icon: Settings, label: 'Settings', color: '#f684a3', route: '/(tabs)/settings' },
@@ -90,21 +89,8 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
                 resizeMode="contain"
               />
             </View>
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <X size={24} color="#374151" />
-            </Pressable>
           </View>
 
-          {/* User Info */}
-          <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>JS</Text>
-            </View>
-            <View>
-              <Text style={styles.userName}>John Smith</Text>
-              <Text style={styles.userEmail}>john.smith@email.com</Text>
-            </View>
-          </View>
 
           {/* Menu Items */}
           <View style={styles.menuItems}>
