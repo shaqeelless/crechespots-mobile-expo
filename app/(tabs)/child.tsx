@@ -7,10 +7,17 @@ import {
   Pressable,
   Image,
   Alert,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Plus, CreditCard as Edit3, Calendar, User } from 'lucide-react-native';
+import { ArrowLeft, Plus, Edit3, Calendar, User, Trash2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SWIPE_THRESHOLD = -80;
+const SWIPE_OUT_DURATION = 200;
 
 interface Child {
   id: string;
@@ -23,46 +30,34 @@ interface Child {
 }
 
 const ChildCardSkeleton = () => (
-  <View style={[styles.childCard, styles.skeletonCard]}>
-    <View style={[styles.childAvatar, styles.skeletonAvatar]} />
-    <View style={styles.childInfo}>
-      <View style={[styles.skeletonText, { width: '60%', height: 20, marginBottom: 8 }]} />
-      <View style={styles.childDetails}>
-        <View style={[styles.skeletonText, { width: 80, height: 16 }]} />
-        <View style={[styles.skeletonText, { width: 60, height: 16 }]} />
+  <View style={styles.skeletonCard}>
+    <View style={styles.skeletonAvatar} />
+    <View style={styles.skeletonInfo}>
+      <View style={[styles.skeletonLine, { width: '60%' }]} />
+      <View style={styles.skeletonDetails}>
+        <View style={[styles.skeletonLine, { width: 80 }]} />
+        <View style={[styles.skeletonLine, { width: 60 }]} />
       </View>
-      <View style={[styles.skeletonText, { width: '40%', height: 14, marginTop: 4 }]} />
+      <View style={[styles.skeletonLine, { width: '40%' }]} />
     </View>
-    <View style={[styles.editButton, styles.skeletonButton]} />
+    <View style={styles.skeletonButton} />
   </View>
 );
 
-export default function ChildrenScreen() {
-  const router = useRouter();
-  const [children, setChildren] = useState<Child[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchChildren();
-  }, []);
-
-  const fetchChildren = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('children')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setChildren(data || []);
-    } catch (error) {
-      console.error('Error fetching children:', error);
-      Alert.alert('Error', 'Failed to load children');
-    } finally {
-      setLoading(false);
-    }
-  };
+// Swipeable Child Card Component
+const SwipeableChildCard = ({ 
+  child, 
+  onEdit, 
+  onView, 
+  onDelete 
+}: { 
+  child: Child;
+  onEdit: () => void;
+  onView: () => void;
+  onDelete: () => void;
+}) => {
+  const position = new Animated.ValueXY();
+  const [isSwiped, setIsSwiped] = useState(false);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -81,54 +76,225 @@ export default function ChildrenScreen() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const renderChildCard = (child: Child) => (
-    <Pressable 
-      key={child.id} 
-      style={styles.childCard}
-      onPress={() => router.push(`/children/${child.id}`)}
-    >
-      <View style={styles.childAvatar}>
-        {child.profile_picture_url ? (
-          <Image source={{ uri: child.profile_picture_url }} style={styles.childAvatarImage} />
-        ) : (
-          <Text style={styles.childAvatarText}>
-            {getInitials(child.first_name, child.last_name)}
-          </Text>
-        )}
-      </View>
-      
-      <View style={styles.childInfo}>
-        <Text style={styles.childName}>
-          {child.first_name} {child.last_name}
-        </Text>
-        <View style={styles.childDetails}>
-          <View style={styles.detailRow}>
-            <Calendar size={14} color="#6b7280" />
-            <Text style={styles.detailText}>
-              {calculateAge(child.date_of_birth)} years old
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !isSwiped,
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy * 2);
+    },
+    onPanResponderMove: (_, gestureState) => {
+      if (gestureState.dx < 0) {
+        position.setValue({ x: Math.max(gestureState.dx, -100), y: 0 });
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx < SWIPE_THRESHOLD) {
+        // Swipe left beyond threshold - show delete
+        Animated.spring(position, {
+          toValue: { x: -80, y: 0 },
+          useNativeDriver: false,
+        }).start();
+        setIsSwiped(true);
+      } else {
+        // Return to original position
+        resetPosition();
+      }
+    },
+  });
+
+  const resetPosition = () => {
+    Animated.spring(position, {
+      toValue: { x: 0, y: 0 },
+      useNativeDriver: false,
+    }).start();
+    setIsSwiped(false);
+  };
+
+  const handleCardPress = () => {
+    if (isSwiped) {
+      resetPosition();
+    } else {
+      onView();
+    }
+  };
+
+  const handleEditPress = (e: any) => {
+    e.stopPropagation();
+    if (isSwiped) {
+      resetPosition();
+    } else {
+      onEdit();
+    }
+  };
+
+  const cardStyle = {
+    transform: position.getTranslateTransform(),
+  };
+
+  return (
+    <View style={styles.swipeContainer}>
+      {/* Delete Background */}
+      {isSwiped && (
+        <View style={styles.deleteBackground}>
+          <Pressable 
+            style={styles.deleteButton}
+            onPress={onDelete}
+          >
+            <Trash2 size={20} color="#ffffff" />
+            <Text style={styles.deleteText}>Delete</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Main Card */}
+      <Animated.View 
+        style={[styles.childCard, cardStyle]}
+        {...panResponder.panHandlers}
+      >
+        <Pressable 
+          style={styles.cardContent}
+          onPress={handleCardPress}
+        >
+          <View style={styles.avatarContainer}>
+            {child.profile_picture_url ? (
+              <Image source={{ uri: child.profile_picture_url }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarText}>
+                  {getInitials(child.first_name, child.last_name)}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.infoContainer}>
+            <Text style={styles.childName}>
+              {child.first_name} {child.last_name}
+            </Text>
+            
+            <View style={styles.detailsContainer}>
+              <View style={styles.detailItem}>
+                <Calendar size={14} color="#6b7280" />
+                <Text style={styles.detailText}>
+                  {calculateAge(child.date_of_birth)} years
+                </Text>
+              </View>
+              
+              <View style={styles.detailItem}>
+                <User size={14} color="#6b7280" />
+                <Text style={styles.detailText}>{child.gender}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.birthDate}>
+              Born {new Date(child.date_of_birth).toLocaleDateString()}
             </Text>
           </View>
-          <View style={styles.detailRow}>
-            <User size={14} color="#6b7280" />
-            <Text style={styles.detailText}>{child.gender}</Text>
-          </View>
-        </View>
-        <Text style={styles.birthDate}>
-          Born: {new Date(child.date_of_birth).toLocaleDateString()}
-        </Text>
-      </View>
-      
-      <Pressable 
-        style={styles.editButton}
-        onPress={(e) => {
-          e.stopPropagation();
-          router.push(`/children/${child.id}/edit`);
-        }}
-      >
-        <Edit3 size={16} color="#bd84f6" />
-      </Pressable>
-    </Pressable>
+          
+          <Pressable 
+            style={styles.editButton}
+            onPress={handleEditPress}
+          >
+            <Edit3 size={18} color="#bd84f6" />
+          </Pressable>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
+};
+
+export default function ChildrenScreen() {
+  const router = useRouter();
+  const [children, setChildren] = useState<Child[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchChildren();
+  }, []);
+
+  const fetchChildren = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('children')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setChildren(data || []);
+    } catch (error) {
+      console.error('Error fetching children:', error);
+      Alert.alert('Error', 'Failed to load children profiles');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteChild = (child: Child) => {
+    Alert.alert(
+      'Delete Profile',
+      `Remove ${child.first_name}'s profile? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => confirmDeleteChild(child.id),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteChild = async (childId: string) => {
+    try {
+      setDeletingId(childId);
+      
+      // Check for active applications
+      const { data: applications, error: appsError } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('child_id', childId);
+
+      if (appsError) throw appsError;
+
+      if (applications && applications.length > 0) {
+        Alert.alert(
+          'Active Applications',
+          'Please withdraw all applications before deleting this profile.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Delete child profile
+      const { error } = await supabase
+        .from('children')
+        .delete()
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      setChildren(prev => prev.filter(child => child.id !== childId));
+      
+      Alert.alert('Success', 'Profile deleted successfully');
+    } catch (error) {
+      console.error('Error deleting child:', error);
+      Alert.alert('Error', 'Failed to delete profile');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleEditChild = (childId: string) => {
+    router.push(`/children/${childId}/edit`);
+  };
+
+  const handleViewChild = (childId: string) => {
+    router.push(`/children/${childId}`);
+  };
 
   return (
     <View style={styles.container}>
@@ -137,7 +303,7 @@ export default function ChildrenScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#374151" />
         </Pressable>
-        <Text style={styles.headerTitle}>My Children</Text>
+        <Text style={styles.title}>My Children</Text>
         <Pressable 
           style={styles.addButton}
           onPress={() => router.push('/children/add')}
@@ -146,35 +312,52 @@ export default function ChildrenScreen() {
         </Pressable>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.childrenContainer}>
-            <ChildCardSkeleton />
+          <View style={styles.childrenList}>
             <ChildCardSkeleton />
             <ChildCardSkeleton />
           </View>
         ) : children.length > 0 ? (
-          <View style={styles.childrenContainer}>
-            {children.map(renderChildCard)}
+          <View style={styles.childrenList}>
+            {children.map((child) => (
+              <SwipeableChildCard
+                key={child.id}
+                child={child}
+                onEdit={() => handleEditChild(child.id)}
+                onView={() => handleViewChild(child.id)}
+                onDelete={() => handleDeleteChild(child)}
+              />
+            ))}
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <User size={48} color="#d1d5db" />
+            <View style={styles.emptyIllustration}>
+              <User size={64} color="#d1d5db" />
             </View>
-            <Text style={styles.emptyTitle}>No children added yet</Text>
-            <Text style={styles.emptyDescription}>
-              Add your children's profiles to start applying to creches
+            <Text style={styles.emptyTitle}>No Children Added</Text>
+            <Text style={styles.emptySubtitle}>
+              Add your children to start applying to creches
             </Text>
             <Pressable 
-              style={styles.addFirstChildButton}
+              style={styles.primaryButton}
               onPress={() => router.push('/children/add')}
             >
-              <Text style={styles.addFirstChildText}>Add Your First Child</Text>
+              <Plus size={20} color="#ffffff" />
+              <Text style={styles.primaryButtonText}>Add First Child</Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
+
+      {/* Loading Overlay */}
+      {deletingId && (
+        <View style={styles.overlay}>
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingText}>Deleting...</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -182,164 +365,253 @@ export default function ChildrenScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4fcfe',
+    backgroundColor: '#f8fafc',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
+  title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#374151',
+    fontWeight: '700',
+    color: '#1f2937',
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    padding: 24,
   },
-  childrenContainer: {
+  childrenList: {
     gap: 16,
   },
-  childCard: {
-    flexDirection: 'row',
+  
+  // Swipeable Card Styles
+  swipeContainer: {
+    position: 'relative',
+    height: 100,
+  },
+  deleteBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#ef4444',
+    borderRadius: 16,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 20,
+  },
+  deleteButton: {
     alignItems: 'center',
+    padding: 12,
+  },
+  deleteText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  childCard: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: '#ffffff',
-    padding: 16,
     borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  skeletonCard: {
-    opacity: 0.7,
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    flex: 1,
   },
-  childAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  avatarContainer: {
+    marginRight: 16,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarPlaceholder: {
     backgroundColor: '#9cdcb8',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
-  skeletonAvatar: {
-    backgroundColor: '#e5e7eb',
-  },
-  childAvatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  childAvatarText: {
+  avatarText: {
     color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
   },
-  childInfo: {
+  infoContainer: {
     flex: 1,
   },
   childName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 6,
   },
-  childDetails: {
+  detailsContainer: {
     flexDirection: 'row',
     gap: 16,
     marginBottom: 4,
   },
-  detailRow: {
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   detailText: {
     fontSize: 14,
     color: '#6b7280',
+    fontWeight: '500',
   },
   birthDate: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#9ca3af',
   },
   editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f9fafb',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  skeletonButton: {
-    backgroundColor: '#e5e7eb',
-    borderColor: '#d1d5db',
+  
+  // Skeleton Styles
+  skeletonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 16,
+    height: 100,
   },
+  skeletonAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#f3f4f6',
+    marginRight: 16,
+  },
+  skeletonInfo: {
+    flex: 1,
+  },
+  skeletonDetails: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
+  skeletonLine: {
+    height: 14,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  skeletonButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+  },
+  
+  // Empty State
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
     paddingHorizontal: 20,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f3f4f6',
+  emptyIllustration: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#f1f5f9',
+    borderStyle: 'dashed',
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
   },
-  emptyDescription: {
+  emptySubtitle: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 24,
+    marginBottom: 32,
   },
-  addFirstChildButton: {
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#bd84f6',
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
+    gap: 8,
+    shadowColor: '#bd84f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  addFirstChildText: {
+  primaryButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
-  skeletonText: {
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
+  
+  // Loading Overlay
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
   },
 });
