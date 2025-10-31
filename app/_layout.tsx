@@ -31,6 +31,9 @@ function LayoutContent() {
       
       {/* Authenticated routes */}
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="help-support" />
+      <Stack.Screen name="safety-centre" />
+      <Stack.Screen name="settings" />
       <Stack.Screen name="search/[id]" />
       <Stack.Screen name="apply/[id]" />
       <Stack.Screen name="children/index" />
