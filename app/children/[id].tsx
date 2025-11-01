@@ -680,7 +680,6 @@ export default function ChildDetailsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#f4fcfe',
   },
   header: {
@@ -740,7 +739,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   content: {
-    flex: 1,
     padding: 20,
   },
   loadingContainer: {
