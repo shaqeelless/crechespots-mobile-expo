@@ -9,7 +9,7 @@ import {
   Dimensions,
   RefreshControl,
 } from 'react-native';
-import { Menu, Bell, MapPin, Star, Clock, Users } from 'lucide-react-native';
+import { Menu, Bell, MapPin, Star, Clock, Users, ChevronDown } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -33,7 +33,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface Creche {
   id: string;
@@ -418,6 +418,56 @@ const AnimatedActivityItem = ({ icon: Icon, title, description, backgroundColor,
   );
 };
 
+// Scroll Down Indicator Component
+const ScrollDownIndicator = ({ scrollY, contentHeight }) => {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const shouldShow = scrollY.value < contentHeight - height * 1.5;
+    
+    return {
+      opacity: shouldShow ? 1 : 0,
+      transform: [
+        { 
+          translateY: withSpring(shouldShow ? 0 : 20, {
+            damping: 15,
+            stiffness: 100,
+          })
+        }
+      ],
+    };
+  });
+
+  const chevronStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateY: withRepeat(
+            withSequence(
+              withTiming(-2, { duration: 800 }),
+              withTiming(2, { duration: 800 })
+            ),
+            -1,
+            true
+          )
+        }
+      ]
+    };
+  });
+
+  return (
+    <AnimatedView style={[styles.scrollIndicator, animatedStyle]}>
+      <AnimatedText style={styles.scrollIndicatorText}>
+        Scroll for more
+      </AnimatedText>
+      <AnimatedView style={chevronStyle}>
+        <ChevronDown size={16} color="#bd84f6" />
+      </AnimatedView>
+    </AnimatedView>
+  );
+};
+
 export default function HomeScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [creches, setCreches] = useState<Creche[]>([]);
@@ -427,9 +477,11 @@ export default function HomeScreen() {
   const { profile } = useAuth();
   const router = useRouter();
 
-  // Header animations
+  // Animation values
   const headerScale = useSharedValue(0.8);
   const headerOpacity = useSharedValue(0);
+  const scrollY = useSharedValue(0);
+  const contentHeight = useSharedValue(0);
 
   useEffect(() => {
     fetchNearbyCreches();
@@ -448,6 +500,14 @@ export default function HomeScreen() {
       opacity: headerOpacity.value,
     };
   });
+
+  const handleScroll = (event) => {
+    scrollY.value = event.nativeEvent.contentOffset.y;
+  };
+
+  const handleContentSizeChange = (width, height) => {
+    contentHeight.value = height;
+  };
 
   const fetchNearbyCreches = async () => {
     try {
@@ -487,6 +547,11 @@ export default function HomeScreen() {
             tintColor={'#bd84f6'}
           />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onContentSizeChange={handleContentSizeChange}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
         <AnimatedView style={[styles.header, headerAnimatedStyle]}>
@@ -650,12 +715,46 @@ export default function HomeScreen() {
                 delay={1500}
               />
             </AnimatedView>
+
+            {/* Bottom Spaces Section - Creates the extended scroll feeling */}
+            <AnimatedView 
+              style={styles.bottomSpaces}
+              entering={FadeInUp.delay(1600).duration(800).springify()}
+            >
+              <View style={styles.bottomSpacesContent}>
+                <Text style={styles.bottomSpacesTitle}>More Coming Soon</Text>
+                <Text style={styles.bottomSpacesDescription}>
+                  We're constantly adding new features and content to enhance your experience
+                </Text>
+                <View style={styles.bottomSpacesGrid}>
+                  <View style={styles.spaceItem}>
+                    <Text style={styles.spaceEmoji}>🎓</Text>
+                    <Text style={styles.spaceText}>Learning Resources</Text>
+                  </View>
+                  <View style={styles.spaceItem}>
+                    <Text style={styles.spaceEmoji}>👥</Text>
+                    <Text style={styles.spaceText}>Parent Community</Text>
+                  </View>
+                  <View style={styles.spaceItem}>
+                    <Text style={styles.spaceEmoji}>📊</Text>
+                    <Text style={styles.spaceText}>Progress Tracking</Text>
+                  </View>
+                  <View style={styles.spaceItem}>
+                    <Text style={styles.spaceEmoji}>🎉</Text>
+                    <Text style={styles.spaceText}>Events & Activities</Text>
+                  </View>
+                </View>
+              </View>
+            </AnimatedView>
           </>
         )}
 
-        {/* Bottom Padding */}
-        <View style={styles.bottomPadding} />
+        {/* Extra Bottom Padding for better scroll feel */}
+        <View style={styles.extraBottomPadding} />
       </AnimatedScrollView>
+
+      {/* Scroll Down Indicator */}
+      <ScrollDownIndicator scrollY={scrollY} contentHeight={contentHeight} />
 
       <SideMenu visible={sideMenuVisible} onClose={() => setSideMenuVisible(false)} />
     </>
@@ -666,6 +765,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f4fcfe',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120, // Extra padding for better scroll feel
   },
   header: {
     paddingTop: 60,
@@ -905,6 +1008,99 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
+  },
+  extraBottomPadding: {
+    height: 200, // Extra space to create the "way down" feeling
+  },
+  // Bottom Spaces Section
+  bottomSpaces: {
+    marginTop: 40,
+    marginHorizontal: 20,
+    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(189, 132, 246, 0.2)',
+    shadowColor: '#bd84f6',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  bottomSpacesContent: {
+    alignItems: 'center',
+  },
+  bottomSpacesTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  bottomSpacesDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  bottomSpacesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  spaceItem: {
+    width: '48%',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(189, 132, 246, 0.1)',
+  },
+  spaceEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  spaceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  // Scroll Down Indicator
+  scrollIndicator: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginHorizontal: '25%',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(189, 132, 246, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  scrollIndicatorText: {
+    fontSize: 12,
+    color: '#bd84f6',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   // Skeleton Loading Styles
   skeletonHeader: {

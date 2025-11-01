@@ -44,6 +44,28 @@ const ChildCardSkeleton = () => (
   </View>
 );
 
+// Function to generate avatar color based on name
+const getAvatarColor = (firstName: string, lastName: string) => {
+  const colors = [
+    '#9cdcb8', // Green
+    '#84a7f6', // Blue
+    '#f68484', // Red
+    '#f6cc84', // Yellow
+    '#bd84f6', // Purple
+    '#84d9f6', // Light Blue
+    '#f6a884', // Orange
+  ];
+  
+  const name = `${firstName}${lastName}`;
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
 // Swipeable Child Card Component
 const SwipeableChildCard = ({ 
   child, 
@@ -156,9 +178,22 @@ const SwipeableChildCard = ({
         >
           <View style={styles.avatarContainer}>
             {child.profile_picture_url ? (
-              <Image source={{ uri: child.profile_picture_url }} style={styles.avatar} />
+              <Image 
+                source={{ uri: child.profile_picture_url }} 
+                style={styles.avatar} 
+                onError={(e) => {
+                  // If image fails to load, fall back to initials
+                  console.log('Image failed to load, using initials');
+                }}
+              />
             ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <View 
+                style={[
+                  styles.avatar, 
+                  styles.avatarPlaceholder,
+                  { backgroundColor: getAvatarColor(child.first_name, child.last_name) }
+                ]}
+              >
                 <Text style={styles.avatarText}>
                   {getInitials(child.first_name, child.last_name)}
                 </Text>
@@ -198,6 +233,129 @@ const SwipeableChildCard = ({
           </Pressable>
         </Pressable>
       </Animated.View>
+    </View>
+  );
+};
+
+// Enhanced Child Card with better image handling
+const EnhancedChildCard = ({ 
+  child, 
+  onEdit, 
+  onView, 
+  onDelete 
+}: { 
+  child: Child;
+  onEdit: () => void;
+  onView: () => void;
+  onDelete: () => void;
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const shouldShowInitials = !child.profile_picture_url || imageError;
+
+  return (
+    <View style={styles.swipeContainer}>
+      {/* Delete Background */}
+      <View style={styles.deleteBackground}>
+        <Pressable 
+          style={styles.deleteButton}
+          onPress={onDelete}
+        >
+          <Trash2 size={20} color="#ffffff" />
+          <Text style={styles.deleteText}>Delete</Text>
+        </Pressable>
+      </View>
+
+      {/* Main Card */}
+      <View style={styles.childCard}>
+        <Pressable 
+          style={styles.cardContent}
+          onPress={onView}
+        >
+          <View style={styles.avatarContainer}>
+            {shouldShowInitials ? (
+              <View 
+                style={[
+                  styles.avatar, 
+                  styles.avatarPlaceholder,
+                  { backgroundColor: getAvatarColor(child.first_name, child.last_name) }
+                ]}
+              >
+                <Text style={styles.avatarText}>
+                  {getInitials(child.first_name, child.last_name)}
+                </Text>
+              </View>
+            ) : (
+              <Image 
+                source={{ uri: child.profile_picture_url }} 
+                style={styles.avatar}
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => setImageLoading(false)}
+                onError={() => {
+                  setImageError(true);
+                  setImageLoading(false);
+                }}
+              />
+            )}
+            
+            {/* Loading indicator for image */}
+            {!shouldShowInitials && imageLoading && (
+              <View style={[styles.avatar, styles.avatarLoading]}>
+                <Text style={styles.avatarText}>...</Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.infoContainer}>
+            <Text style={styles.childName}>
+              {child.first_name} {child.last_name}
+            </Text>
+            
+            <View style={styles.detailsContainer}>
+              <View style={styles.detailItem}>
+                <Calendar size={14} color="#6b7280" />
+                <Text style={styles.detailText}>
+                  {calculateAge(child.date_of_birth)} years
+                </Text>
+              </View>
+              
+              <View style={styles.detailItem}>
+                <User size={14} color="#6b7280" />
+                <Text style={styles.detailText}>{child.gender}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.birthDate}>
+              Born {new Date(child.date_of_birth).toLocaleDateString()}
+            </Text>
+          </View>
+          
+          <Pressable 
+            style={styles.editButton}
+            onPress={onEdit}
+          >
+            <Edit3 size={18} color="#bd84f6" />
+          </Pressable>
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -318,7 +476,7 @@ export default function ChildrenScreen() {
         ) : children.length > 0 ? (
           <View style={styles.childrenList}>
             {children.map((child) => (
-              <SwipeableChildCard
+              <EnhancedChildCard
                 key={child.id}
                 child={child}
                 onEdit={() => handleEditChild(child.id)}
@@ -445,6 +603,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: 16,
+    position: 'relative',
   },
   avatar: {
     width: 56,
@@ -452,7 +611,12 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
   avatarPlaceholder: {
-    backgroundColor: '#9cdcb8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLoading: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
