@@ -9,7 +9,19 @@ import {
   Dimensions,
   RefreshControl,
 } from 'react-native';
-import { Menu, Bell, MapPin, Star, Clock, Users, ChevronDown } from 'lucide-react-native';
+import { 
+  Menu, 
+  Bell, 
+  MapPin, 
+  Star, 
+  Clock, 
+  Users, 
+  ChevronDown,
+  Search,
+  Baby,
+  ClipboardList,
+  Newspaper
+} from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -193,7 +205,7 @@ const FloatingNotificationBadge = () => {
 };
 
 // Animated Action Button
-const AnimatedActionButton = ({ emoji, text, backgroundColor, delay, onPress }) => {
+const AnimatedActionButton = ({ icon: Icon, text, backgroundColor, delay, onPress }) => {
   const translateY = useSharedValue(50);
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.8);
@@ -251,7 +263,9 @@ const AnimatedActionButton = ({ emoji, text, backgroundColor, delay, onPress }) 
       style={[styles.actionButton, { backgroundColor }, animatedStyle]}
       onPress={onPress}
     >
-      <Animated.Text style={styles.actionEmoji}>{emoji}</Animated.Text>
+      <Animated.View style={styles.actionIconContainer}>
+        <Icon size={24} color="#ffffff" />
+      </Animated.View>
       <Animated.Text style={[styles.actionText, textAnimatedStyle]}>
         {text}
       </Animated.Text>
@@ -612,7 +626,7 @@ export default function HomeScreen() {
               entering={FadeInUp.delay(600).duration(800).springify()}
             >
               <AnimatedActionButton
-                emoji="🔍"
+                icon={Search}
                 text="Find Creches"
                 backgroundColor="#f68484"
                 delay={700}
@@ -620,7 +634,7 @@ export default function HomeScreen() {
               />
               
               <AnimatedActionButton
-                emoji="👶"
+                icon={Baby}
                 text="My Children"
                 backgroundColor="#9cdcb8"
                 delay={800}
@@ -628,7 +642,7 @@ export default function HomeScreen() {
               />
               
               <AnimatedActionButton
-                emoji="📋"
+                icon={ClipboardList}
                 text="Applications"
                 backgroundColor="#84a7f6"
                 delay={900}
@@ -636,7 +650,7 @@ export default function HomeScreen() {
               />
               
               <AnimatedActionButton
-                emoji="📰"
+                icon={Newspaper}
                 text="Feeds"
                 backgroundColor="#f6cc84"
                 delay={1000}
@@ -841,8 +855,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionEmoji: {
-    fontSize: 28,
+  actionIconContainer: {
     marginBottom: 8,
   },
   actionText: {
