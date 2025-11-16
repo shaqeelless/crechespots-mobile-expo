@@ -8,6 +8,9 @@ import {
   Image,
   Dimensions,
   RefreshControl,
+  Modal,
+  TextInput,
+  FlatList,
 } from 'react-native';
 import { 
   Menu, 
@@ -20,7 +23,9 @@ import {
   Search,
   Baby,
   ClipboardList,
-  Newspaper
+  Newspaper,
+  X,
+  ChevronRight
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -60,6 +65,14 @@ interface Creche {
   capacity: number;
   registered: boolean;
   applications: boolean;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  suburb: string;
+  city: string;
+  province: string;
 }
 
 // Animated Components
@@ -259,17 +272,17 @@ const AnimatedActionButton = ({ icon: Icon, text, backgroundColor, delay, onPres
   }, []);
 
   return (
-    <AnimatedPressable 
-      style={[styles.actionButton, { backgroundColor }, animatedStyle]}
-      onPress={onPress}
-    >
-      <Animated.View style={styles.actionIconContainer}>
+    <View style={styles.actionButtonContainer}>
+      <AnimatedPressable 
+        style={[styles.actionButton, { backgroundColor }, animatedStyle]}
+        onPress={onPress}
+      >
         <Icon size={24} color="#ffffff" />
-      </Animated.View>
-      <Animated.Text style={[styles.actionText, textAnimatedStyle]}>
+      </AnimatedPressable>
+      <Animated.Text style={[styles.actionButtonText, textAnimatedStyle]}>
         {text}
       </Animated.Text>
-    </AnimatedPressable>
+    </View>
   );
 };
 
@@ -482,13 +495,114 @@ const ScrollDownIndicator = ({ scrollY, contentHeight }) => {
   );
 };
 
+// Location Selection Modal
+const LocationModal = ({ visible, onClose, onLocationSelect, currentLocation }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestedLocations, setSuggestedLocations] = useState<Location[]>([
+    {
+      id: '1',
+      name: 'Current Location',
+      suburb: currentLocation?.suburb || '',
+      city: currentLocation?.city || '',
+      province: currentLocation?.province || '',
+    },
+    {
+      id: '2',
+      name: 'Johannesburg Central',
+      suburb: 'Braamfontein',
+      city: 'Johannesburg',
+      province: 'Gauteng',
+    },
+    {
+      id: '3',
+      name: 'Cape Town City Bowl',
+      suburb: 'City Bowl',
+      city: 'Cape Town',
+      province: 'Western Cape',
+    },
+    {
+      id: '4',
+      name: 'Durban Beachfront',
+      suburb: 'Beachfront',
+      city: 'Durban',
+      province: 'KwaZulu-Natal',
+    },
+    {
+      id: '5',
+      name: 'Pretoria East',
+      suburb: 'Menlo Park',
+      city: 'Pretoria',
+      province: 'Gauteng',
+    },
+  ]);
+
+  const filteredLocations = suggestedLocations.filter(location =>
+    location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    location.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    location.suburb.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleLocationSelect = (location: Location) => {
+    onLocationSelect(location);
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Select Location</Text>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <X size={24} color="#374151" />
+          </Pressable>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Search size={20} color="#9ca3af" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for suburb, city or province..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        <FlatList
+          data={filteredLocations}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <Pressable 
+              style={styles.locationItem}
+              onPress={() => handleLocationSelect(item)}
+            >
+              <View style={styles.locationInfo}>
+                <Text style={styles.locationName}>{item.name}</Text>
+                <Text style={styles.locationAddress}>
+                  {[item.suburb, item.city, item.province].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+              <ChevronRight size={20} color="#9ca3af" />
+            </Pressable>
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      </View>
+    </Modal>
+  );
+};
+
 export default function HomeScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [creches, setCreches] = useState<Creche[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const router = useRouter();
 
   // Animation values
@@ -496,6 +610,13 @@ export default function HomeScreen() {
   const headerOpacity = useSharedValue(0);
   const scrollY = useSharedValue(0);
   const contentHeight = useSharedValue(0);
+
+  // Current location state
+  const [currentLocation, setCurrentLocation] = useState({
+    suburb: profile?.suburb || '',
+    city: profile?.city || '',
+    province: profile?.province || '',
+  });
 
   useEffect(() => {
     fetchNearbyCreches();
@@ -527,9 +648,17 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from('creches')
-        .select('*')
+      
+      let query = supabase.from('creches').select('*');
+      
+      // If we have a specific location, filter by it
+      if (currentLocation.city) {
+        query = query.ilike('city', `%${currentLocation.city}%`);
+      } else if (currentLocation.province) {
+        query = query.ilike('province', `%${currentLocation.province}%`);
+      }
+      
+      const { data, error } = await query
         .order('name')
         .limit(10);
 
@@ -547,6 +676,41 @@ export default function HomeScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchNearbyCreches();
+  };
+
+  const handleLocationSelect = async (location: Location) => {
+    try {
+      setCurrentLocation({
+        suburb: location.suburb,
+        city: location.city,
+        province: location.province,
+      });
+
+      // Update profile in database if user is logged in
+      if (profile?.id) {
+        await updateProfile({
+          suburb: location.suburb,
+          city: location.city,
+          province: location.province,
+        });
+      }
+
+      // Refresh creches for new location
+      fetchNearbyCreches();
+    } catch (error) {
+      console.error('Error updating location:', error);
+    }
+  };
+
+  const getLocationDisplayText = () => {
+    if (currentLocation.suburb && currentLocation.city) {
+      return `${currentLocation.suburb}, ${currentLocation.city}`;
+    } else if (currentLocation.city) {
+      return currentLocation.city;
+    } else if (currentLocation.province) {
+      return currentLocation.province;
+    }
+    return 'Select your location';
   };
 
   return (
@@ -603,16 +767,19 @@ export default function HomeScreen() {
             Welcome back{profile?.first_name ? `, ${profile.first_name}` : ''}!
           </AnimatedText>
           
-          <AnimatedText 
-            style={styles.locationText}
-            entering={FadeInUp.delay(400).duration(800).springify()}
+          <Pressable 
+            style={styles.locationSelector}
+            onPress={() => setLocationModalVisible(true)}
           >
-            📍{' '}
-            {profile
-              ? [profile.suburb, profile.city, profile.province].filter(Boolean).join(', ') ||
-                'Update your location in profile'
-              : 'Loading location...'}
-          </AnimatedText>
+            <MapPin size={16} color="#bd84f6" />
+            <AnimatedText 
+              style={styles.locationText}
+              entering={FadeInUp.delay(400).duration(800).springify()}
+            >
+              {getLocationDisplayText()}
+            </AnimatedText>
+            <ChevronDown size={16} color="#bd84f6" />
+          </Pressable>
         </AnimatedView>
 
         {/* Show Skeleton Loader when loading */}
@@ -663,7 +830,7 @@ export default function HomeScreen() {
               style={styles.section}
               entering={FadeInUp.delay(1100).duration(800).springify()}
             >
-              <Text style={styles.sectionTitle}>Nearby Creches</Text>
+              <Text style={styles.sectionTitle}>Nearby Creches in {currentLocation.city || 'Your Area'}</Text>
               <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
               
               {error ? (
@@ -698,9 +865,13 @@ export default function HomeScreen() {
                   style={styles.emptyContainer}
                   entering={BounceIn.duration(800)}
                 >
-                  <Text style={styles.emptyText}>No creches found in your area</Text>
-                  <Pressable style={styles.retryButton} onPress={fetchNearbyCreches}>
-                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  <Text style={styles.emptyText}>No creches found in {currentLocation.city || 'your area'}</Text>
+                  <Text style={styles.emptySubtext}>Try selecting a different location</Text>
+                  <Pressable 
+                    style={styles.retryButton} 
+                    onPress={() => setLocationModalVisible(true)}
+                  >
+                    <Text style={styles.retryButtonText}>Change Location</Text>
                   </Pressable>
                 </AnimatedView>
               )}
@@ -771,6 +942,14 @@ export default function HomeScreen() {
       <ScrollDownIndicator scrollY={scrollY} contentHeight={contentHeight} />
 
       <SideMenu visible={sideMenuVisible} onClose={() => setSideMenuVisible(false)} />
+
+      {/* Location Selection Modal */}
+      <LocationModal
+        visible={locationModalVisible}
+        onClose={() => setLocationModalVisible(false)}
+        onLocationSelect={handleLocationSelect}
+        currentLocation={currentLocation}
+      />
     </>
   );
 }
@@ -782,7 +961,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 120, // Extra padding for better scroll feel
+    paddingBottom: 120,
   },
   header: {
     paddingTop: 60,
@@ -836,11 +1015,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#374151',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  locationSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    alignSelf: 'flex-start',
   },
   locationText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#bd84f6',
+    fontWeight: '600',
+    marginHorizontal: 8,
   },
   quickActions: {
     flexDirection: 'row',
@@ -848,20 +1037,31 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 20,
   },
-  actionButton: {
+  actionButtonContainer: {
+    alignItems: 'center',
     width: (width - 60) / 4,
-    height: 96,
-    borderRadius: 12,
+  },
+  actionButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  actionIconContainer: {
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  actionText: {
-    fontSize: 14,
+  actionButtonText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#374151',
+    textAlign: 'center',
   },
   section: {
     marginTop: 32,
@@ -978,7 +1178,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#6b7280',
-    marginBottom: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 16,
     textAlign: 'center',
   },
   retryButton: {
@@ -1019,11 +1225,8 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 14,
   },
-  bottomPadding: {
-    height: 40,
-  },
   extraBottomPadding: {
-    height: 200, // Extra space to create the "way down" feeling
+    height: 200,
   },
   // Bottom Spaces Section
   bottomSpaces: {
@@ -1114,6 +1317,64 @@ const styles = StyleSheet.create({
     color: '#bd84f6',
     fontWeight: '600',
     marginBottom: 2,
+  },
+  // Location Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#374151',
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  locationInfo: {
+    flex: 1,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  locationAddress: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    marginLeft: 16,
   },
   // Skeleton Loading Styles
   skeletonHeader: {
