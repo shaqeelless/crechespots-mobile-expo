@@ -42,7 +42,7 @@ const NotificationSkeleton = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.skeletonBackButton} />
+        <View style={styles.skeletonButtBackon} />
         <View style={styles.skeletonHeaderTitle} />
         <View style={styles.skeletonHeaderActions} />
       </View>
@@ -330,9 +330,6 @@ export default function NotificationsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#374151" />
-          </Pressable>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Notifications</Text>
             {unreadCount > 0 && (
