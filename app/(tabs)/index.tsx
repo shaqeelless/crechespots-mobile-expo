@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderEndEndRadius: 150,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#bd84f6',
   },
   headerTop: {
     flexDirection: 'row',
