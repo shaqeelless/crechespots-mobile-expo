@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderEndEndRadius: 150,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#bfe5ef',
   },
   headerTop: {
     flexDirection: 'row',
