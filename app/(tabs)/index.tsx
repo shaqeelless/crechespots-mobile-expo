@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   FlatList,
+  Alert,
 } from 'react-native';
 import { 
   Menu, 
@@ -25,8 +26,10 @@ import {
   ClipboardList,
   Newspaper,
   X,
-  ChevronRight
+  ChevronRight,
+  Navigation
 } from 'lucide-react-native';
+import * as Location from 'expo-location';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -73,6 +76,8 @@ interface Location {
   suburb: string;
   city: string;
   province: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 // Animated Components
@@ -496,15 +501,15 @@ const ScrollDownIndicator = ({ scrollY, contentHeight }) => {
 };
 
 // Location Selection Modal
-const LocationModal = ({ visible, onClose, onLocationSelect, currentLocation }) => {
+const LocationModal = ({ visible, onClose, onLocationSelect, currentLocation, onUseCurrentLocation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestedLocations, setSuggestedLocations] = useState<Location[]>([
     {
-      id: '1',
-      name: 'Current Location',
-      suburb: currentLocation?.suburb || '',
-      city: currentLocation?.city || '',
-      province: currentLocation?.province || '',
+      id: 'current',
+      name: 'Use Current Location',
+      suburb: 'Current Location',
+      city: 'Detected Automatically',
+      province: '',
     },
     {
       id: '2',
@@ -543,7 +548,11 @@ const LocationModal = ({ visible, onClose, onLocationSelect, currentLocation }) 
   );
 
   const handleLocationSelect = (location: Location) => {
-    onLocationSelect(location);
+    if (location.id === 'current') {
+      onUseCurrentLocation();
+    } else {
+      onLocationSelect(location);
+    }
     onClose();
   };
 
@@ -585,7 +594,11 @@ const LocationModal = ({ visible, onClose, onLocationSelect, currentLocation }) 
                   {[item.suburb, item.city, item.province].filter(Boolean).join(', ')}
                 </Text>
               </View>
-              <ChevronRight size={20} color="#9ca3af" />
+              {item.id === 'current' ? (
+                <Navigation size={20} color="#bd84f6" />
+              ) : (
+                <ChevronRight size={20} color="#9ca3af" />
+              )}
             </Pressable>
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -602,6 +615,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
   const { profile, updateProfile } = useAuth();
   const router = useRouter();
 
@@ -616,10 +630,77 @@ export default function HomeScreen() {
     suburb: profile?.suburb || '',
     city: profile?.city || '',
     province: profile?.province || '',
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
 
+  // Get user's current location
+  const getCurrentLocation = async () => {
+    try {
+      setLocationLoading(true);
+      
+      // Request permission
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Please enable location permissions in settings to use automatic location detection.',
+          [{ text: 'OK' }]
+        );
+        setLocationLoading(false);
+        return null;
+      }
+
+      // Get current position
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      // Reverse geocode to get address
+      let geocode = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (geocode.length > 0) {
+        const address = geocode[0];
+        const locationData = {
+          suburb: address.district || address.subregion || '',
+          city: address.city || address.region || '',
+          province: address.region || '',
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
+
+        setCurrentLocation(locationData);
+        
+        // Update profile with location data
+        if (profile?.id) {
+          await updateProfile({
+            suburb: locationData.suburb,
+            city: locationData.city,
+            province: locationData.province,
+          });
+        }
+
+        setLocationLoading(false);
+        return locationData;
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert(
+        'Location Error',
+        'Unable to get your current location. Please try again or select a location manually.',
+        [{ text: 'OK' }]
+      );
+    }
+    
+    setLocationLoading(false);
+    return null;
+  };
+
   useEffect(() => {
-    fetchNearbyCreches();
+    initializeApp();
     
     // Header entrance animation
     headerScale.value = withSpring(1, {
@@ -628,6 +709,25 @@ export default function HomeScreen() {
     });
     headerOpacity.value = withTiming(1, { duration: 800 });
   }, []);
+
+  const initializeApp = async () => {
+    // First try to get current location automatically
+    const locationData = await getCurrentLocation();
+    
+    // If location failed but we have profile location, use that
+    if (!locationData && profile?.city) {
+      setCurrentLocation({
+        suburb: profile.suburb || '',
+        city: profile.city || '',
+        province: profile.province || '',
+        latitude: null,
+        longitude: null,
+      });
+    }
+    
+    // Then fetch creches
+    fetchNearbyCreches();
+  };
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -684,6 +784,8 @@ export default function HomeScreen() {
         suburb: location.suburb,
         city: location.city,
         province: location.province,
+        latitude: null,
+        longitude: null,
       });
 
       // Update profile in database if user is logged in
@@ -702,7 +804,15 @@ export default function HomeScreen() {
     }
   };
 
+  const handleUseCurrentLocation = async () => {
+    await getCurrentLocation();
+    fetchNearbyCreches();
+  };
+
   const getLocationDisplayText = () => {
+    if (locationLoading) {
+      return 'Detecting location...';
+    }
     if (currentLocation.suburb && currentLocation.city) {
       return `${currentLocation.suburb}, ${currentLocation.city}`;
     } else if (currentLocation.city) {
@@ -770,15 +880,24 @@ export default function HomeScreen() {
           <Pressable 
             style={styles.locationSelector}
             onPress={() => setLocationModalVisible(true)}
+            disabled={locationLoading}
           >
             <MapPin size={16} color="#bd84f6" />
             <AnimatedText 
-              style={styles.locationText}
+              style={[
+                styles.locationText,
+                locationLoading && styles.locationTextLoading
+              ]}
               entering={FadeInUp.delay(400).duration(800).springify()}
             >
               {getLocationDisplayText()}
             </AnimatedText>
-            <ChevronDown size={16} color="#bd84f6" />
+            {!locationLoading && <ChevronDown size={16} color="#bd84f6" />}
+            {locationLoading && (
+              <View style={styles.loadingSpinner}>
+                <Text style={styles.loadingSpinnerText}>⟳</Text>
+              </View>
+            )}
           </Pressable>
         </AnimatedView>
 
@@ -830,7 +949,9 @@ export default function HomeScreen() {
               style={styles.section}
               entering={FadeInUp.delay(1100).duration(800).springify()}
             >
-              <Text style={styles.sectionTitle}>Nearby Creches in {currentLocation.city || 'Your Area'}</Text>
+              <Text style={styles.sectionTitle}>
+                {currentLocation.city ? `Nearby Creches in ${currentLocation.city}` : 'Nearby Creches'}
+              </Text>
               <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
               
               {error ? (
@@ -948,6 +1069,7 @@ export default function HomeScreen() {
         visible={locationModalVisible}
         onClose={() => setLocationModalVisible(false)}
         onLocationSelect={handleLocationSelect}
+        onUseCurrentLocation={handleUseCurrentLocation}
         currentLocation={currentLocation}
       />
     </>
@@ -1030,6 +1152,16 @@ const styles = StyleSheet.create({
     color: '#bd84f6',
     fontWeight: '600',
     marginHorizontal: 8,
+  },
+  locationTextLoading: {
+    color: '#9ca3af',
+  },
+  loadingSpinner: {
+    marginLeft: 4,
+  },
+  loadingSpinnerText: {
+    fontSize: 14,
+    color: '#bd84f6',
   },
   quickActions: {
     flexDirection: 'row',

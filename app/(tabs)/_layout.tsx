@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Search, Baby, BookOpen, User } from 'lucide-react-native';
+import { Chrome as Home, Bell, Baby, BookOpen, User } from 'lucide-react-native';
 import { useEffect } from 'react';
 import Animated, {
   useSharedValue,
@@ -273,11 +273,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="feeds"
         options={{
-          title: 'Search',
+          title: 'Feeds',
           tabBarIcon: ({ size, color, focused }) => (
-            <Search size={size} color={color} />
+            <BookOpen size={size} color={color} />
           ),
         }}
       />
@@ -290,12 +290,13 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="feeds"
+
+            <Tabs.Screen
+        name="notifications"
         options={{
-          title: 'Feeds',
+          title: 'Notification',
           tabBarIcon: ({ size, color, focused }) => (
-            <BookOpen size={size} color={color} />
+            <Bell size={size} color={color} />
           ),
         }}
       />

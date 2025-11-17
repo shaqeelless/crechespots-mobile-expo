@@ -16,17 +16,15 @@ import { supabase } from '@/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
-// Add your logo image import here
-// import LogoImage from '@/assets/images/logo.png';
-
 const onboardingSteps = [
   {
     id: 1,
-    title: 'Find Trusted Childcare',
+    title: 'Welcome to crechespots',
     subtitle: 'Your Trusted Link to Easy Childcare',
     description: 'Browse verified creches and daycares in your area with detailed profiles, photos, and parent reviews.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
+    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
   },
   {
     id: 2,
@@ -35,6 +33,7 @@ const onboardingSteps = [
     description: 'All childcare providers are thoroughly vetted with background checks, certifications, and safety inspections.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
+    image: require('@/assets/images/Onboardin-2.png'), // Add your image path
   },
   {
     id: 3,
@@ -43,6 +42,7 @@ const onboardingSteps = [
     description: 'Submit applications to multiple creches instantly. Track your progress and get notifications when accepted.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
+    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
   },
   {
     id: 4,
@@ -53,6 +53,7 @@ const onboardingSteps = [
     color: '#3a5dc4',
     isForm: true,
     formType: 'name',
+    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
   },
   {
     id: 5,
@@ -63,6 +64,7 @@ const onboardingSteps = [
     color: '#ffffff',
     isForm: true,
     formType: 'photo',
+    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
   },
   {
     id: 6,
@@ -73,6 +75,7 @@ const onboardingSteps = [
     color: '#ffffff',
     isForm: true,
     formType: 'contact',
+    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
   },
 ];
 
@@ -87,6 +90,7 @@ export default function OnboardingScreen() {
   });
   const [loading, setLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const imageScale = useRef(new Animated.Value(1)).current;
   const router = useRouter();
 
   const handleNext = async () => {
@@ -112,6 +116,21 @@ export default function OnboardingScreen() {
     }
 
     if (currentIndex < onboardingSteps.length - 1) {
+      // Animate image scale
+      Animated.sequence([
+        Animated.timing(imageScale, {
+          toValue: 0.8,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(imageScale, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate content fade
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -297,7 +316,7 @@ export default function OnboardingScreen() {
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
+            source={require('@/assets/images/SplashScreen.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -308,6 +327,20 @@ export default function OnboardingScreen() {
           <Text style={styles.skipButtonText}>Skip to Login</Text>
         </Pressable>
       </View>
+
+      {/* Onboarding Image */}
+      <Animated.View 
+        style={[
+          styles.imageContainer,
+          { transform: [{ scale: imageScale }] }
+        ]}
+      >
+        <Image 
+          source={currentStep.image}
+          style={styles.onboardingImage}
+          resizeMode="contain"
+        />
+      </Animated.View>
 
       {/* Content */}
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
@@ -354,7 +387,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
     position: 'relative',
   },
   logoContainer: {
@@ -363,8 +396,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   logoImage: {
-    width: 200, // Adjust based on your logo dimensions
-    height: 60, // Adjust based on your logo dimensions
+    width: 200,
+    height: 60,
   },
   skipButton: {
     position: 'absolute',
@@ -379,6 +412,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  onboardingImage: {
+    width: width * 0.8,
+    height: 200,
+    maxHeight: 200,
   },
   content: {
     flex: 1,
