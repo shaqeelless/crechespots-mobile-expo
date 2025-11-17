@@ -131,8 +131,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: '#ffffff',
+    paddingBottom: 24,
+    borderEndEndRadius: 150,
+    backgroundColor: '#bfe5ef',
   },
   backButton: {
     width: 40,
