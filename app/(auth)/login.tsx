@@ -33,6 +33,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [lastError, setLastError] = useState('');
 
   // Preload images
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function LoginScreen() {
 
   // Validation functions
   const validateForm = () => {
-    const errors = {};
+    const errors: any = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
     if (!formData.email.trim()) {
@@ -75,6 +76,7 @@ export default function LoginScreen() {
 
   const clearErrors = () => {
     setFormErrors({});
+    setLastError('');
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -82,6 +84,10 @@ export default function LoginScreen() {
     // Clear error for this field when user starts typing
     if (formErrors[field]) {
       setFormErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    // Clear last error when user starts typing in password field
+    if (field === 'password' && lastError) {
+      setLastError('');
     }
   };
 
@@ -91,7 +97,7 @@ export default function LoginScreen() {
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       const firstError = Object.values(errors)[0];
-      Alert.alert('Please check your information', firstError);
+      Alert.alert('Please check your information', firstError as string);
       return;
     }
 
@@ -100,33 +106,114 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      const { error } = await signIn(formData.email, formData.password);
+      const { error, data } = await signIn(formData.email, formData.password);
       
       if (error) {
+        console.log('Login error details:', error);
+        
         // Handle specific error types
-        let errorMessage = 'Login failed. Please try again.';
+        let errorMessage = 'Wrong password. Please try again.';
         
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Invalid email or password. Please check your credentials.';
+        // Supabase returns 400 Bad Request for invalid credentials
+        if (error.status === 400) {
+          errorMessage = 'Wrong password. Please check your password and try again.';
+          setLastError('wrong_password');
+        } else if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Wrong password. Please check your password and try again.';
+          setLastError('wrong_password');
         } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please verify your email address before logging in.';
+          errorMessage = 'Please verify your email address before logging in. Check your inbox for the verification email.';
         } else if (error.message.includes('network') || error.message.includes('internet')) {
-          errorMessage = 'Network error. Please check your internet connection.';
+          errorMessage = 'Network error. Please check your internet connection and try again.';
         } else if (error.message.includes('rate limit')) {
-          errorMessage = 'Too many attempts. Please try again in a few minutes.';
+          errorMessage = 'Too many login attempts. Please wait a few minutes before trying again.';
+        } else if (error.message.includes('User not found')) {
+          errorMessage = 'No account found with this email address. Please check your email or sign up for a new account.';
+        } else if (error.message.includes('badly formatted')) {
+          errorMessage = 'Invalid email format. Please check your email address.';
         }
-        
+
         Alert.alert('Login Error', errorMessage);
+
       } else {
         // Successfully logged in
-        router.replace('/(tabs)');
+        
+        // Check if user needs to complete profile
+        if (data?.user?.user_metadata?.profile_complete === false) {
+          Alert.alert(
+            'Welcome Back!',
+            'Please complete your profile to continue.',
+            [{ text: 'Continue', onPress: () => router.replace('/(tabs)/profile') }]
+          );
+        } else {
+          router.replace('/(tabs)');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      
+      let errorMessage = 'Wrong password. Please try again.';
+      
+      // Handle specific error types
+      if (error?.status === 400) {
+        errorMessage = 'Wrong password. Please check your password and try again.';
+        setLastError('wrong_password');
+      } else if (error?.code === 'NETWORK_ERROR') {
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      } else if (error?.code === 'TIMEOUT') {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error?.message?.includes('JSON')) {
+        errorMessage = 'Server response error. Please try again in a moment.';
+      }
+
+      Alert.alert('Login Error', errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    if (!formData.email.trim()) {
+      Alert.alert(
+        'Enter Your Email',
+        'Please enter your email address first, then tap "Forgot Password" to reset it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Enter Email', 
+            onPress: () => {
+              // Focus email input
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      Alert.alert(
+        'Invalid Email',
+        'Please enter a valid email address to reset your password.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Fix Email', 
+            onPress: () => {
+              // Focus email input
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    // Navigate to forgot password with email pre-filled
+    router.push({
+      pathname: '/(auth)/forgot-password',
+      params: { email: formData.email }
+    });
   };
 
   return (
@@ -152,6 +239,15 @@ export default function LoginScreen() {
         <View style={styles.content}>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue finding trusted childcare</Text>
+
+          {/* Password Help Tip */}
+          {lastError === 'wrong_password' && (
+            <View style={styles.helpTip}>
+              <Text style={styles.helpTipText}>
+                💡 Wrong password. Check for typing mistakes or reset your password.
+              </Text>
+            </View>
+          )}
 
           {/* Form */}
           <View style={styles.form}>
@@ -195,8 +291,13 @@ export default function LoginScreen() {
             </View>
             {formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
 
-            <Pressable style={styles.forgotPasswordButton}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            <Pressable 
+              style={styles.forgotPasswordButton}
+              onPress={handleForgotPassword}
+            >
+              <Text style={styles.forgotPasswordText}>
+                Forgot Password?
+              </Text>
             </Pressable>
           </View>
 
@@ -220,6 +321,16 @@ export default function LoginScreen() {
               Don't have an account? <Text style={styles.registerLink}>Sign Up</Text>
             </Text>
           </Pressable>
+
+          {/* Help Section */}
+          <View style={styles.helpSection}>
+            <Text style={styles.helpTitle}>Having trouble signing in?</Text>
+            <Text style={styles.helpText}>
+              • Check your password for typos{'\n'}
+              • Make sure CAPS LOCK is off{'\n'}
+              • Reset your password if needed
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -269,6 +380,20 @@ const styles = StyleSheet.create({
     marginBottom: isSmallScreen ? 24 : 32,
     opacity: 0.9,
     lineHeight: isSmallScreen ? 20 : 22,
+  },
+  helpTip: {
+    backgroundColor: '#ffebee',
+    padding: isSmallScreen ? 12 : 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
+    marginBottom: isSmallScreen ? 16 : 20,
+  },
+  helpTipText: {
+    color: '#c62828',
+    fontSize: isSmallScreen ? 12 : 13,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   form: {
     marginBottom: isSmallScreen ? 24 : 32,
@@ -336,6 +461,7 @@ const styles = StyleSheet.create({
   },
   registerContainer: {
     alignItems: 'center',
+    marginBottom: isSmallScreen ? 20 : 24,
   },
   registerText: {
     textAlign: 'center',
@@ -347,5 +473,26 @@ const styles = StyleSheet.create({
     color: '#3a5dc4',
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  helpSection: {
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    padding: isSmallScreen ? 16 : 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(58, 93, 196, 0.2)',
+  },
+  helpTitle: {
+    color: '#3a5dc4',
+    fontSize: isSmallScreen ? 14 : 15,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  helpText: {
+    color: '#3a5dc4',
+    fontSize: isSmallScreen ? 12 : 13,
+    opacity: 0.8,
+    lineHeight: isSmallScreen ? 16 : 18,
+    textAlign: 'center',
   },
 });
