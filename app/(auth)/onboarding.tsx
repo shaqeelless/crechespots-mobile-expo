@@ -26,6 +26,8 @@ const preloadedImages = {
   onboarding2: require('@/assets/images/Onboardin-2.png'),
   onboarding3: require('@/assets/images/Onboardin-3.png'),
   onboarding4: require('@/assets/images/Onboardin-4.png'),
+  onboarding5: require('@/assets/images/Onboardin-5.png'),
+  onboarding6: require('@/assets/images/Onboardin-6.png'),
   splashScreen: require('@/assets/images/SplashScreen.png'),
 };
 
@@ -71,7 +73,7 @@ const onboardingSteps = [
     description: 'Browse verified creches and daycares in your area with detailed profiles, photos, and parent reviews.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
-    image: preloadedImages.onboarding1,
+    image: preloadedImages.onboarding4,
   },
   {
     id: 2,
@@ -89,7 +91,7 @@ const onboardingSteps = [
     description: 'Submit applications to multiple creches instantly. Track your progress and get notifications when accepted.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
-    image: preloadedImages.onboarding3,
+    image: preloadedImages.onboarding1,
   },
   {
     id: 4,
@@ -100,7 +102,7 @@ const onboardingSteps = [
     color: '#3a5dc4',
     isForm: true,
     formType: 'name',
-    image: preloadedImages.onboarding1,
+    image: preloadedImages.onboarding5,
   },
   {
     id: 5,
@@ -111,11 +113,11 @@ const onboardingSteps = [
     color: '#3a5dc4',
     isForm: true,
     formType: 'contact',
-    image: preloadedImages.onboarding3,
+    image: preloadedImages.onboarding6,
   },
   {
     id: 6,
-    title: 'Create Password',
+    title: 'Nearly Done',
     subtitle: 'Secure your account',
     description: 'Create a strong password to protect your account and personal information.',
     backgroundColor: '#f4fcfe',
