@@ -95,9 +95,17 @@ export default function ProfileScreen() {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await signOut();
-          if (!error) {
-            router.replace('/(auth)/welcome');
+          try {
+            const result = await signOut();
+            // Handle different response formats
+            if (result?.error || result === false) {
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            } else {
+              router.replace('/(auth)/welcome');
+            }
+          } catch (error) {
+            console.error('Sign out error:', error);
+            Alert.alert('Error', 'Failed to sign out. Please try again.');
           }
         },
       },
@@ -120,7 +128,11 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>Profile</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile Info */}
         <View style={styles.profileSection}>
           <View style={styles.profileHeader}>
@@ -209,27 +221,44 @@ export default function ProfileScreen() {
 
         {/* Sign Out */}
         <View style={styles.section}>
-          <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+          <Pressable 
+            style={styles.signOutButton} 
+            onPress={handleSignOut}
+          >
             <LogOut size={20} color="#ef4444" />
             <Text style={styles.signOutText}>Sign Out</Text>
           </Pressable>
         </View>
+
+        {/* Extra padding at the bottom for better scrolling */}
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4fcfe' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#f4fcfe' 
+  },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 24,
-
     backgroundColor: '#ffffff',
   },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#374151' },
-  content: { flex: 1 },
+  headerTitle: { 
+    fontSize: 24, 
+    fontWeight: 'bold', 
+    color: '#374151' 
+  },
+  content: { 
+    flex: 1 
+  },
+  scrollContent: {
+    paddingBottom: 40, // Extra padding for better scroll
+  },
   profileSection: {
     backgroundColor: '#ffffff',
     marginBottom: 24,
@@ -243,7 +272,10 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     marginBottom: 20,
   },
-  avatarContainer: { position: 'relative', marginRight: 16 },
+  avatarContainer: { 
+    position: 'relative', 
+    marginRight: 16 
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -252,7 +284,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
+  avatarText: { 
+    color: '#ffffff', 
+    fontSize: 24, 
+    fontWeight: 'bold' 
+  },
   editAvatarButton: {
     position: 'absolute',
     bottom: 0,
@@ -266,22 +302,59 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffffff',
   },
-  profileInfo: { flex: 1 },
-  profileName: { fontSize: 20, fontWeight: 'bold', color: '#374151', marginBottom: 4 },
-  profileEmail: { fontSize: 16, color: '#6b7280', marginBottom: 2 },
-  memberSince: { fontSize: 14, color: '#9ca3af' },
-  contactSection: { paddingHorizontal: 20, marginBottom: 20 },
-  contactItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  contactText: { fontSize: 14, color: '#6b7280', marginLeft: 8, flex: 1 },
+  profileInfo: { 
+    flex: 1 
+  },
+  profileName: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: '#374151', 
+    marginBottom: 4 
+  },
+  profileEmail: { 
+    fontSize: 16, 
+    color: '#6b7280', 
+    marginBottom: 2 
+  },
+  memberSince: { 
+    fontSize: 14, 
+    color: '#9ca3af' 
+  },
+  contactSection: { 
+    paddingHorizontal: 20, 
+    marginBottom: 20 
+  },
+  contactItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 8 
+  },
+  contactText: { 
+    fontSize: 14, 
+    color: '#6b7280', 
+    marginLeft: 8, 
+    flex: 1 
+  },
   section: {
     backgroundColor: '#ffffff',
     marginBottom: 24,
     paddingHorizontal: 20,
     paddingVertical: 24,
   },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151', marginBottom: 16 },
-  menuContainer: { gap: 4 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16 },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#374151', 
+    marginBottom: 16 
+  },
+  menuContainer: { 
+    gap: 4 
+  },
+  menuItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 16 
+  },
   menuIcon: {
     width: 36,
     height: 36,
@@ -291,8 +364,17 @@ const styles = StyleSheet.create({
     marginRight: 16,
     opacity: 0.9,
   },
-  menuLabel: { flex: 1, fontSize: 16, color: '#374151', fontWeight: '500' },
-  menuArrow: { fontSize: 20, color: '#9ca3af', fontWeight: '300' },
+  menuLabel: { 
+    flex: 1, 
+    fontSize: 16, 
+    color: '#374151', 
+    fontWeight: '500' 
+  },
+  menuArrow: { 
+    fontSize: 20, 
+    color: '#9ca3af', 
+    fontWeight: '300' 
+  },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -303,6 +385,17 @@ const styles = StyleSheet.create({
     borderColor: '#ef4444',
     backgroundColor: '#fef2f2',
   },
-  signOutText: { color: '#ef4444', fontSize: 16, fontWeight: '600', marginLeft: 8 },
-  skeletonText: { borderRadius: 4, backgroundColor: '#e5e7eb' },
+  signOutText: { 
+    color: '#ef4444', 
+    fontSize: 16, 
+    fontWeight: '600', 
+    marginLeft: 8 
+  },
+  bottomPadding: {
+    height: 60, // Extra space at bottom for better scrolling
+  },
+  skeletonText: { 
+    borderRadius: 4, 
+    backgroundColor: '#e5e7eb' 
+  },
 });

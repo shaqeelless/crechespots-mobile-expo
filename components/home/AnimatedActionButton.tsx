@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,7 +11,8 @@ import Animated, {
 
 const { width } = Dimensions.get('window');
 
-const AnimatedPressable = Animated.createAnimatedComponent(View);
+// Use TouchableOpacity instead of View for the animated component
+const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
 interface AnimatedActionButtonProps {
@@ -81,11 +82,23 @@ const AnimatedActionButton: React.FC<AnimatedActionButtonProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
+  const handlePress = () => {
+    console.log(`🔼 AnimatedActionButton "${text}" pressed`);
+    console.log(`🔍 onPress function available: ${typeof onPress === 'function'}`);
+    
+    if (typeof onPress === 'function') {
+      onPress();
+    } else {
+      console.error('❌ onPress is not a function');
+    }
+  };
+
   return (
     <View style={styles.actionButtonContainer}>
       <AnimatedPressable 
         style={[styles.actionButton, { backgroundColor }, animatedStyle]}
-        onPress={onPress}
+        onPress={handlePress}
+        activeOpacity={0.7} // Add feedback when pressed
       >
         <Icon size={24} color="#ffffff" />
       </AnimatedPressable>

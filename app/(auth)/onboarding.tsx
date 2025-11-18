@@ -238,156 +238,169 @@ export default function OnboardingScreen() {
     setFormErrors({});
   };
 
-  const handleNext = async () => {
-    const currentStep = onboardingSteps[currentIndex];
+const handleNext = async () => {
+  const currentStep = onboardingSteps[currentIndex];
+  
+  // Validate form steps
+  if (currentStep.isForm) {
+    let errors = {};
     
-    // Validate form steps
-    if (currentStep.isForm) {
-      let errors = {};
-      
-      if (currentStep.formType === 'name') {
-        errors = validateName();
-      } else if (currentStep.formType === 'contact') {
-        errors = validateContact();
-      } else if (currentStep.formType === 'password') {
-        errors = validatePassword();
-      }
-
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        
-        // Show first error in alert
-        const firstError = Object.values(errors)[0];
-        Alert.alert('Please check your information', firstError);
-        return;
-      }
-
-      // Clear errors if validation passes
-      clearErrors();
+    if (currentStep.formType === 'name') {
+      errors = validateName();
+    } else if (currentStep.formType === 'contact') {
+      errors = validateContact();
+    } else if (currentStep.formType === 'password') {
+      errors = validatePassword();
     }
 
-    if (currentIndex < onboardingSteps.length - 1) {
-      // Smooth image transition
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(imageOpacity, {
-            toValue: 0,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.timing(imageScale, {
-            toValue: 0.9,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(imageOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(imageScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      
+      // Show first error in alert
+      const firstError = Object.values(errors)[0];
+      Alert.alert('Please check your information', firstError);
+      return;
+    }
 
-      // Content fade animation
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
+    // Clear errors if validation passes
+    clearErrors();
+  }
+
+  // If this is the password step (last step), create the account
+  if (currentStep.formType === 'password') {
+    console.log('🔐 Creating account...');
+    await createAccount();
+    return; // Stop here, don't increment index
+  }
+
+  // For all other steps, proceed to next step
+  if (currentIndex < onboardingSteps.length - 1) {
+    // Smooth image transition
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(imageOpacity, {
           toValue: 0,
-          duration: 150,
+          duration: 100,
           useNativeDriver: true,
         }),
-        Animated.timing(fadeAnim, {
+        Animated.timing(imageScale, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(imageOpacity, {
           toValue: 1,
-          duration: 150,
+          duration: 200,
           useNativeDriver: true,
         }),
-      ]).start();
+        Animated.timing(imageScale, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
 
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
+    // Content fade animation
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-  const createAccount = async () => {
-    try {
-      setLoading(true);
-      
-      // Combine country code and phone number
-      const fullPhoneNumber = `${formData.countryCode}${formData.phone}`;
-      
-      console.log('Attempting to create account with:', {
-        email: formData.email,
-        phone: fullPhoneNumber,
-        firstName: formData.firstName,
-        lastName: formData.lastName
-      });
+    setCurrentIndex(currentIndex + 1);
+  }
+};
 
-      // Create Supabase account
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            phone_number: fullPhoneNumber,
-            display_name: `${formData.firstName} ${formData.lastName}`,
-          }
-        }
-      });
+const createAccount = async () => {
+  try {
+    setLoading(true);
+    console.log('🚀 Starting account creation process...');
+    
+    // Combine country code and phone number
+    const fullPhoneNumber = `${formData.countryCode}${formData.phone}`;
+    
+    console.log('📝 Account details:', {
+      email: formData.email,
+      phone: fullPhoneNumber,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      passwordLength: formData.password.length
+    });
 
-      if (error) {
-        // Handle specific error types
-        if (error.message.includes('User already registered')) {
-          throw new Error('EMAIL_EXISTS');
-        } else if (error.message.includes('Invalid email')) {
-          throw new Error('INVALID_EMAIL');
-        } else if (error.message.includes('Password')) {
-          throw new Error('WEAK_PASSWORD');
-        } else if (error.message.includes('Error sending confirmation email')) {
-          // Account created but email failed - still proceed
-          console.log('Account created but email sending failed');
-          await handleSuccessfulAccountCreation(data?.user?.id, fullPhoneNumber);
-          return;
-        } else {
-          throw error;
+    // Create Supabase account
+    console.log('🔐 Calling Supabase auth.signUp...');
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone_number: fullPhoneNumber,
+          display_name: `${formData.firstName} ${formData.lastName}`,
         }
       }
+    });
 
-      console.log('Auth response:', data);
+    console.log('📨 Supabase response:', { data, error });
 
-      if (data.user) {
-        console.log('User created successfully:', data.user.id);
-        await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber);
+    if (error) {
+      console.error('❌ Supabase error:', error);
+      // Handle specific error types
+      if (error.message.includes('User already registered')) {
+        throw new Error('EMAIL_EXISTS');
+      } else if (error.message.includes('Invalid email')) {
+        throw new Error('INVALID_EMAIL');
+      } else if (error.message.includes('Password')) {
+        throw new Error('WEAK_PASSWORD');
+      } else if (error.message.includes('Error sending confirmation email')) {
+        // Account created but email failed - still proceed
+        console.log('ℹ️ Account created but email sending failed');
+        await handleSuccessfulAccountCreation(data?.user?.id, fullPhoneNumber);
+        return;
       } else {
-        throw new Error('No user data returned from authentication');
+        throw error;
       }
-    } catch (error) {
-      console.error('Error creating account:', error);
-      
-      // User-friendly error messages
-      let errorMessage = 'Unable to create account. Please try again.';
-      
-      if (error.message === 'EMAIL_EXISTS') {
-        errorMessage = 'An account with this email already exists. Please try logging in instead.';
-      } else if (error.message === 'INVALID_EMAIL') {
-        errorMessage = 'Please enter a valid email address.';
-      } else if (error.message === 'WEAK_PASSWORD') {
-        errorMessage = 'Please choose a stronger password with at least 6 characters.';
-      } else if (error.message.includes('network') || error.message.includes('internet')) {
-        errorMessage = 'Network error. Please check your internet connection and try again.';
-      }
-      
-      Alert.alert('Registration Failed', errorMessage);
-    } finally {
-      setLoading(false);
     }
-  };
+
+    if (data.user) {
+      console.log('✅ User created successfully:', data.user.id);
+      await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber);
+    } else {
+      console.error('❌ No user data returned');
+      throw new Error('No user data returned from authentication');
+    }
+  } catch (error) {
+    console.error('💥 Error creating account:', error);
+    
+    // User-friendly error messages
+    let errorMessage = 'Unable to create account. Please try again.';
+    
+    if (error.message === 'EMAIL_EXISTS') {
+      errorMessage = 'An account with this email already exists. Please try logging in instead.';
+    } else if (error.message === 'INVALID_EMAIL') {
+      errorMessage = 'Please enter a valid email address.';
+    } else if (error.message === 'WEAK_PASSWORD') {
+      errorMessage = 'Please choose a stronger password with at least 6 characters.';
+    } else if (error.message.includes('network') || error.message.includes('internet')) {
+      errorMessage = 'Network error. Please check your internet connection and try again.';
+    }
+    
+    Alert.alert('Registration Failed', errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSuccessfulAccountCreation = async (userId: string | undefined, fullPhoneNumber: string) => {
     try {
