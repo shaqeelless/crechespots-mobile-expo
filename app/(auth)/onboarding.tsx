@@ -24,16 +24,18 @@ const isSmallScreen = height < 700;
 const preloadedImages = {
   onboarding1: require('@/assets/images/Onboardin-1.png'),
   onboarding2: require('@/assets/images/Onboardin-2.png'),
+  onboarding3: require('@/assets/images/Onboardin-3.png'),
+  onboarding4: require('@/assets/images/Onboardin-4.png'),
   splashScreen: require('@/assets/images/SplashScreen.png'),
 };
 
-// Country codes data
+// Country codes data - South Africa first
 const countryCodes = [
+  { code: '+27', flag: '🇿🇦', country: 'South Africa' },
   { code: '+1', flag: '🇺🇸', country: 'United States' },
   { code: '+44', flag: '🇬🇧', country: 'United Kingdom' },
   { code: '+61', flag: '🇦🇺', country: 'Australia' },
   { code: '+64', flag: '🇳🇿', country: 'New Zealand' },
-  { code: '+27', flag: '🇿🇦', country: 'South Africa' },
   { code: '+91', flag: '🇮🇳', country: 'India' },
   { code: '+86', flag: '🇨🇳', country: 'China' },
   { code: '+81', flag: '🇯🇵', country: 'Japan' },
@@ -64,7 +66,7 @@ const countryCodes = [
 const onboardingSteps = [
   {
     id: 1,
-    title: 'Welcome to crechespots',
+    title: 'Welcome to Crechespots',
     subtitle: 'Your Trusted Link to Easy Childcare',
     description: 'Browse verified creches and daycares in your area with detailed profiles, photos, and parent reviews.',
     backgroundColor: '#f4fcfe',
@@ -87,7 +89,7 @@ const onboardingSteps = [
     description: 'Submit applications to multiple creches instantly. Track your progress and get notifications when accepted.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
-    image: preloadedImages.onboarding1,
+    image: preloadedImages.onboarding3,
   },
   {
     id: 4,
@@ -109,7 +111,7 @@ const onboardingSteps = [
     color: '#3a5dc4',
     isForm: true,
     formType: 'contact',
-    image: preloadedImages.onboarding1,
+    image: preloadedImages.onboarding3,
   },
   {
     id: 6,
@@ -131,7 +133,7 @@ export default function OnboardingScreen() {
     lastName: '',
     email: '',
     phone: '',
-    countryCode: '+1', // Default country code
+    countryCode: '+27', // South Africa as default
     password: '',
     confirmPassword: '',
   });
@@ -140,6 +142,7 @@ export default function OnboardingScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showCountryCodeModal, setShowCountryCodeModal] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const imageScale = useRef(new Animated.Value(1)).current;
   const imageOpacity = useRef(new Animated.Value(1)).current;
@@ -152,6 +155,8 @@ export default function OnboardingScreen() {
         const imageUris = [
           Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding1).uri),
           Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding2).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding3).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding4).uri),
           Image.prefetch(Image.resolveAssetSource(preloadedImages.splashScreen).uri),
         ];
         
@@ -166,55 +171,95 @@ export default function OnboardingScreen() {
     preloadImages();
   }, []);
 
+  // Validation functions
+  const validateName = () => {
+    const errors = {};
+    if (!formData.firstName.trim()) {
+      errors.firstName = 'First name is required';
+    } else if (formData.firstName.trim().length < 2) {
+      errors.firstName = 'First name must be at least 2 characters';
+    }
+    
+    if (!formData.lastName.trim()) {
+      errors.lastName = 'Last name is required';
+    } else if (formData.lastName.trim().length < 2) {
+      errors.lastName = 'Last name must be at least 2 characters';
+    }
+    
+    return errors;
+  };
+
+  const validateContact = () => {
+    const errors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else {
+      const phoneRegex = /^[0-9]{9,15}$/;
+      const cleanPhone = formData.phone.replace(/\s/g, '');
+      if (!phoneRegex.test(cleanPhone)) {
+        errors.phone = 'Please enter a valid phone number (9-15 digits)';
+      }
+    }
+    
+    return errors;
+  };
+
+  const validatePassword = () => {
+    const errors = {};
+    
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
+    }
+
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    
+    return errors;
+  };
+
+  const clearErrors = () => {
+    setFormErrors({});
+  };
+
   const handleNext = async () => {
     const currentStep = onboardingSteps[currentIndex];
     
     // Validate form steps
     if (currentStep.isForm) {
+      let errors = {};
+      
       if (currentStep.formType === 'name') {
-        if (!formData.firstName.trim() || !formData.lastName.trim()) {
-          Alert.alert('Required', 'Please enter your first and last name');
-          return;
-        }
+        errors = validateName();
       } else if (currentStep.formType === 'contact') {
-        if (!formData.email.trim() || !formData.phone.trim()) {
-          Alert.alert('Required', 'Please enter your email and phone number');
-          return;
-        }
-        
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.email)) {
-          Alert.alert('Invalid Email', 'Please enter a valid email address');
-          return;
-        }
-
-        // Phone number validation (basic - just check if it has numbers)
-        const phoneRegex = /^[0-9]+$/;
-        if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
-          Alert.alert('Invalid Phone', 'Please enter a valid phone number');
-          return;
-        }
+        errors = validateContact();
       } else if (currentStep.formType === 'password') {
-        if (!formData.password.trim() || !formData.confirmPassword.trim()) {
-          Alert.alert('Required', 'Please enter and confirm your password');
-          return;
-        }
+        errors = validatePassword();
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
         
-        if (formData.password.length < 6) {
-          Alert.alert('Weak Password', 'Password must be at least 6 characters long');
-          return;
-        }
-        
-        if (formData.password !== formData.confirmPassword) {
-          Alert.alert('Password Mismatch', 'Passwords do not match. Please try again.');
-          return;
-        }
-        
-        // Create account on final step
-        await createAccount();
+        // Show first error in alert
+        const firstError = Object.values(errors)[0];
+        Alert.alert('Please check your information', firstError);
         return;
       }
+
+      // Clear errors if validation passes
+      clearErrors();
     }
 
     if (currentIndex < onboardingSteps.length - 1) {
@@ -278,7 +323,7 @@ export default function OnboardingScreen() {
         lastName: formData.lastName
       });
 
-      // Create Supabase account - the trigger will automatically create the public.users record
+      // Create Supabase account
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -293,52 +338,54 @@ export default function OnboardingScreen() {
       });
 
       if (error) {
-        // Don't show console error for email sending issues
-        if (!error.message.includes('Error sending confirmation email')) {
-          console.error('Supabase auth error:', error);
-        }
-        
-        // If it's an email sending error, we still consider it a success
-        // because the user account was created, just the email couldn't be sent
-        if (error.message.includes('Error sending confirmation email')) {
-          console.log('Account created but email sending failed. Proceeding to confirmation screen.');
-          await handleSuccessfulAccountCreation(data?.user?.id, fullPhoneNumber, false);
+        // Handle specific error types
+        if (error.message.includes('User already registered')) {
+          throw new Error('EMAIL_EXISTS');
+        } else if (error.message.includes('Invalid email')) {
+          throw new Error('INVALID_EMAIL');
+        } else if (error.message.includes('Password')) {
+          throw new Error('WEAK_PASSWORD');
+        } else if (error.message.includes('Error sending confirmation email')) {
+          // Account created but email failed - still proceed
+          console.log('Account created but email sending failed');
+          await handleSuccessfulAccountCreation(data?.user?.id, fullPhoneNumber);
           return;
+        } else {
+          throw error;
         }
-        
-        throw error;
       }
 
       console.log('Auth response:', data);
 
       if (data.user) {
         console.log('User created successfully:', data.user.id);
-        await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber, true);
+        await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber);
       } else {
         throw new Error('No user data returned from authentication');
       }
     } catch (error) {
       console.error('Error creating account:', error);
       
-      // More specific error messages based on the error type
-      if (error.message?.includes('User already registered')) {
-        Alert.alert('Account Exists', 'An account with this email already exists. Please try logging in instead.');
-      } else if (error.message?.includes('Invalid email')) {
-        Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      } else if (error.message?.includes('Password')) {
-        Alert.alert('Weak Password', 'Please choose a stronger password.');
-      } else {
-        Alert.alert(
-          'Registration Failed', 
-          'Unable to create account. Please check your internet connection and try again.'
-        );
+      // User-friendly error messages
+      let errorMessage = 'Unable to create account. Please try again.';
+      
+      if (error.message === 'EMAIL_EXISTS') {
+        errorMessage = 'An account with this email already exists. Please try logging in instead.';
+      } else if (error.message === 'INVALID_EMAIL') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.message === 'WEAK_PASSWORD') {
+        errorMessage = 'Please choose a stronger password with at least 6 characters.';
+      } else if (error.message.includes('network') || error.message.includes('internet')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
       }
+      
+      Alert.alert('Registration Failed', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSuccessfulAccountCreation = async (userId: string | undefined, fullPhoneNumber: string, emailSent: boolean) => {
+  const handleSuccessfulAccountCreation = async (userId: string | undefined, fullPhoneNumber: string) => {
     try {
       if (userId) {
         // Wait a moment for the trigger to create the public.users record
@@ -348,7 +395,7 @@ export default function OnboardingScreen() {
         await updateUserProfile(userId, fullPhoneNumber);
       }
 
-      // Redirect to confirmation screen regardless of email sending status
+      // Redirect to confirmation screen
       router.replace('/(auth)/confirm-email');
       
     } catch (error) {
@@ -367,7 +414,7 @@ export default function OnboardingScreen() {
         .eq('id', userId)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows returned
+      if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error fetching user profile:', fetchError);
         return;
       }
@@ -380,7 +427,6 @@ export default function OnboardingScreen() {
             first_name: formData.firstName,
             last_name: formData.lastName,
             phone_number: fullPhoneNumber,
-            country_code: formData.countryCode,
             display_name: `${formData.firstName} ${formData.lastName}`,
             updated_at: new Date().toISOString(),
           })
@@ -403,7 +449,6 @@ export default function OnboardingScreen() {
               first_name: formData.firstName,
               last_name: formData.lastName,
               phone_number: fullPhoneNumber,
-              country_code: formData.countryCode,
               display_name: `${formData.firstName} ${formData.lastName}`,
               profile_picture_url: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png',
               created_at: new Date().toISOString(),
@@ -429,6 +474,14 @@ export default function OnboardingScreen() {
   const selectCountryCode = (country) => {
     setFormData({ ...formData, countryCode: country.code });
     setShowCountryCodeModal(false);
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (formErrors[field]) {
+      setFormErrors(prev => ({ ...prev, [field]: '' }));
+    }
   };
 
   const renderDots = () => {
@@ -496,25 +549,28 @@ export default function OnboardingScreen() {
             <View style={styles.inputContainer}>
               <User size={20} color="#3a5dc4" />
               <TextInput
-                style={styles.input}
+                style={[styles.input, formErrors.firstName && styles.inputError]}
                 placeholder="First Name"
                 placeholderTextColor="#666"
                 value={formData.firstName}
-                onChangeText={(text) => setFormData({ ...formData, firstName: text })}
+                onChangeText={(text) => handleInputChange('firstName', text)}
                 autoCapitalize="words"
               />
             </View>
+            {formErrors.firstName && <Text style={styles.errorText}>{formErrors.firstName}</Text>}
+
             <View style={styles.inputContainer}>
               <User size={20} color="#3a5dc4" />
               <TextInput
-                style={styles.input}
+                style={[styles.input, formErrors.lastName && styles.inputError]}
                 placeholder="Last Name"
                 placeholderTextColor="#666"
                 value={formData.lastName}
-                onChangeText={(text) => setFormData({ ...formData, lastName: text })}
+                onChangeText={(text) => handleInputChange('lastName', text)}
                 autoCapitalize="words"
               />
             </View>
+            {formErrors.lastName && <Text style={styles.errorText}>{formErrors.lastName}</Text>}
           </View>
         );
       
@@ -524,16 +580,18 @@ export default function OnboardingScreen() {
             <View style={styles.inputContainer}>
               <Mail size={20} color="#3a5dc4" />
               <TextInput
-                style={styles.input}
+                style={[styles.input, formErrors.email && styles.inputError]}
                 placeholder="Email Address"
                 placeholderTextColor="#666"
                 value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                onChangeText={(text) => handleInputChange('email', text)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
               />
             </View>
+            {formErrors.email && <Text style={styles.errorText}>{formErrors.email}</Text>}
+
             <View style={styles.phoneInputContainer}>
               <Pressable 
                 style={styles.countryCodeSelector}
@@ -542,19 +600,20 @@ export default function OnboardingScreen() {
                 <Text style={styles.countryCodeText}>{formData.countryCode}</Text>
                 <ChevronDown size={16} color="#3a5dc4" />
               </Pressable>
-              <View style={styles.phoneInput}>
+              <View style={[styles.phoneInput, formErrors.phone && styles.inputError]}>
                 <Phone size={20} color="#3a5dc4" />
                 <TextInput
                   style={styles.phoneNumberInput}
                   placeholder="Phone Number"
                   placeholderTextColor="#666"
                   value={formData.phone}
-                  onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                  onChangeText={(text) => handleInputChange('phone', text)}
                   keyboardType="phone-pad"
                   autoComplete="tel"
                 />
               </View>
             </View>
+            {formErrors.phone && <Text style={styles.errorText}>{formErrors.phone}</Text>}
             {renderCountryCodeModal()}
           </View>
         );
@@ -565,11 +624,11 @@ export default function OnboardingScreen() {
             <View style={styles.inputContainer}>
               <Lock size={20} color="#3a5dc4" />
               <TextInput
-                style={styles.input}
+                style={[styles.input, formErrors.password && styles.inputError]}
                 placeholder="Create Password"
                 placeholderTextColor="#666"
                 value={formData.password}
-                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                onChangeText={(text) => handleInputChange('password', text)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -583,14 +642,16 @@ export default function OnboardingScreen() {
                 </Text>
               </Pressable>
             </View>
+            {formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
+
             <View style={styles.inputContainer}>
               <Lock size={20} color="#3a5dc4" />
               <TextInput
-                style={styles.input}
+                style={[styles.input, formErrors.confirmPassword && styles.inputError]}
                 placeholder="Confirm Password"
                 placeholderTextColor="#666"
                 value={formData.confirmPassword}
-                onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+                onChangeText={(text) => handleInputChange('confirmPassword', text)}
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -604,6 +665,8 @@ export default function OnboardingScreen() {
                 </Text>
               </Pressable>
             </View>
+            {formErrors.confirmPassword && <Text style={styles.errorText}>{formErrors.confirmPassword}</Text>}
+            
             <Text style={styles.passwordHint}>
               Password must be at least 6 characters long
             </Text>
@@ -703,9 +766,6 @@ export default function OnboardingScreen() {
   );
 }
 
-// ... (styles remain exactly the same as previous version)
-
-// ... (styles remain the same as previous version)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -795,7 +855,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
-    gap: isSmallScreen ? 12 : 16,
+    gap: isSmallScreen ? 8 : 12,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -812,6 +872,16 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: isSmallScreen ? 14 : 16,
     color: '#333',
+  },
+  inputError: {
+    borderColor: '#ff6b6b',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: isSmallScreen ? 12 : 13,
+    marginTop: 4,
+    marginLeft: 8,
   },
   // Phone input styles
   phoneInputContainer: {
