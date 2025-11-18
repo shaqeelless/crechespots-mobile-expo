@@ -14,7 +14,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowRight, User, Mail, Phone, Camera, Check, Lock, ChevronDown } from 'lucide-react-native';
+import { ArrowRight, User, Mail, Phone, Camera, Check, Lock, ChevronDown, Eye, EyeOff, AlertCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -95,8 +95,8 @@ const onboardingSteps = [
   },
   {
     id: 4,
-    title: 'Let’s Get to Know You',
-    subtitle: 'We’re Happy You’re Here',
+    title: 'Let\'s Get to Know You',
+    subtitle: 'We\'re Happy You\'re Here',
     description: 'Tell us your name so we can set up your parent profile and help our creche community welcome you properly.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
@@ -118,7 +118,7 @@ const onboardingSteps = [
   {
     id: 6,
     title: 'Almost There!',
-    subtitle: 'Let’s Keep Your Space Secure',
+    subtitle: 'Let\'s Keep Your Space Secure',
     description: 'Create a password to protect your account — your info is safe with your new Crechespots family.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
@@ -127,6 +127,75 @@ const onboardingSteps = [
     image: preloadedImages.onboarding1,
   },
 ];
+
+// Password strength checker
+const checkPasswordStrength = (password: string) => {
+  if (!password) return { strength: 0, feedback: [] };
+
+  const feedback = [];
+  let strength = 0;
+
+  // Length check
+  if (password.length >= 8) {
+    strength += 1;
+  } else {
+    feedback.push('At least 8 characters');
+  }
+
+  // Uppercase check
+  if (/[A-Z]/.test(password)) {
+    strength += 1;
+  } else {
+    feedback.push('One uppercase letter (A-Z)');
+  }
+
+  // Lowercase check
+  if (/[a-z]/.test(password)) {
+    strength += 1;
+  } else {
+    feedback.push('One lowercase letter (a-z)');
+  }
+
+  // Number check
+  if (/\d/.test(password)) {
+    strength += 1;
+  } else {
+    feedback.push('One number (0-9)');
+  }
+
+  // Symbol check
+  if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    strength += 1;
+  } else {
+    feedback.push('One symbol (!@#$% etc.)');
+  }
+
+  return { strength, feedback };
+};
+
+const getStrengthColor = (strength: number) => {
+  switch (strength) {
+    case 0: return '#ff6b6b';
+    case 1: return '#ff6b6b';
+    case 2: return '#ffa726';
+    case 3: return '#ffd54f';
+    case 4: return '#9cdcb8';
+    case 5: return '#66bb6a';
+    default: return '#ff6b6b';
+  }
+};
+
+const getStrengthLabel = (strength: number) => {
+  switch (strength) {
+    case 0: return 'Very Weak';
+    case 1: return 'Weak';
+    case 2: return 'Fair';
+    case 3: return 'Good';
+    case 4: return 'Strong';
+    case 5: return 'Very Strong';
+    default: return 'Very Weak';
+  }
+};
 
 export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -145,10 +214,18 @@ export default function OnboardingScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showCountryCodeModal, setShowCountryCodeModal] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [passwordStrength, setPasswordStrength] = useState({ strength: 0, feedback: [] });
+  const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const imageScale = useRef(new Animated.Value(1)).current;
   const imageOpacity = useRef(new Animated.Value(1)).current;
   const router = useRouter();
+
+  // Update password strength when password changes
+  useEffect(() => {
+    const strength = checkPasswordStrength(formData.password);
+    setPasswordStrength(strength);
+  }, [formData.password]);
 
   // Preload and cache images
   useEffect(() => {
@@ -221,8 +298,9 @@ export default function OnboardingScreen() {
     
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters long';
+    } else if (passwordStrength.strength < 3) {
+      errors.password = 'Please choose a stronger password';
+      setShowPasswordFeedback(true);
     }
 
     if (!formData.confirmPassword) {
@@ -238,169 +316,214 @@ export default function OnboardingScreen() {
     setFormErrors({});
   };
 
-const handleNext = async () => {
-  const currentStep = onboardingSteps[currentIndex];
-  
-  // Validate form steps
-  if (currentStep.isForm) {
-    let errors = {};
+  const handleNext = async () => {
+    console.log(`🔄 handleNext called for step ${currentIndex + 1}`);
+    const currentStep = onboardingSteps[currentIndex];
     
-    if (currentStep.formType === 'name') {
-      errors = validateName();
-    } else if (currentStep.formType === 'contact') {
-      errors = validateContact();
-    } else if (currentStep.formType === 'password') {
-      errors = validatePassword();
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
+    // Validate form steps
+    if (currentStep.isForm) {
+      let errors = {};
       
-      // Show first error in alert
-      const firstError = Object.values(errors)[0];
-      Alert.alert('Please check your information', firstError);
-      return;
-    }
-
-    // Clear errors if validation passes
-    clearErrors();
-  }
-
-  // If this is the password step (last step), create the account
-  if (currentStep.formType === 'password') {
-    console.log('🔐 Creating account...');
-    await createAccount();
-    return; // Stop here, don't increment index
-  }
-
-  // For all other steps, proceed to next step
-  if (currentIndex < onboardingSteps.length - 1) {
-    // Smooth image transition
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(imageOpacity, {
-          toValue: 0,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(imageScale, {
-          toValue: 0.9,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(imageOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(imageScale, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-
-    // Content fade animation
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    setCurrentIndex(currentIndex + 1);
-  }
-};
-
-const createAccount = async () => {
-  try {
-    setLoading(true);
-    console.log('🚀 Starting account creation process...');
-    
-    // Combine country code and phone number
-    const fullPhoneNumber = `${formData.countryCode}${formData.phone}`;
-    
-    console.log('📝 Account details:', {
-      email: formData.email,
-      phone: fullPhoneNumber,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      passwordLength: formData.password.length
-    });
-
-    // Create Supabase account
-    console.log('🔐 Calling Supabase auth.signUp...');
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          phone_number: fullPhoneNumber,
-          display_name: `${formData.firstName} ${formData.lastName}`,
-        }
+      if (currentStep.formType === 'name') {
+        errors = validateName();
+      } else if (currentStep.formType === 'contact') {
+        errors = validateContact();
+      } else if (currentStep.formType === 'password') {
+        errors = validatePassword();
       }
-    });
 
-    console.log('📨 Supabase response:', { data, error });
-
-    if (error) {
-      console.error('❌ Supabase error:', error);
-      // Handle specific error types
-      if (error.message.includes('User already registered')) {
-        throw new Error('EMAIL_EXISTS');
-      } else if (error.message.includes('Invalid email')) {
-        throw new Error('INVALID_EMAIL');
-      } else if (error.message.includes('Password')) {
-        throw new Error('WEAK_PASSWORD');
-      } else if (error.message.includes('Error sending confirmation email')) {
-        // Account created but email failed - still proceed
-        console.log('ℹ️ Account created but email sending failed');
-        await handleSuccessfulAccountCreation(data?.user?.id, fullPhoneNumber);
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        
+        // Show first error in alert for better visibility
+        const firstError = Object.values(errors)[0];
+        Alert.alert('Please check your information', firstError);
         return;
-      } else {
-        throw error;
       }
+
+      // Clear errors if validation passes
+      clearErrors();
     }
 
-    if (data.user) {
-      console.log('✅ User created successfully:', data.user.id);
-      await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber);
-    } else {
-      console.error('❌ No user data returned');
-      throw new Error('No user data returned from authentication');
+    // If this is the password step (last step), create the account
+    if (currentStep.formType === 'password') {
+      console.log('🔐 Creating account...');
+      await createAccount();
+      return; // Stop here, don't increment index
     }
-  } catch (error) {
-    console.error('💥 Error creating account:', error);
-    
-    // User-friendly error messages
-    let errorMessage = 'Unable to create account. Please try again.';
-    
-    if (error.message === 'EMAIL_EXISTS') {
-      errorMessage = 'An account with this email already exists. Please try logging in instead.';
-    } else if (error.message === 'INVALID_EMAIL') {
-      errorMessage = 'Please enter a valid email address.';
-    } else if (error.message === 'WEAK_PASSWORD') {
-      errorMessage = 'Please choose a stronger password with at least 6 characters.';
-    } else if (error.message.includes('network') || error.message.includes('internet')) {
-      errorMessage = 'Network error. Please check your internet connection and try again.';
+
+    // For all other steps, proceed to next step
+    if (currentIndex < onboardingSteps.length - 1) {
+      // Smooth image transition
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(imageOpacity, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(imageScale, {
+            toValue: 0.9,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(imageOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(imageScale, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+
+      // Content fade animation
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      setCurrentIndex(currentIndex + 1);
     }
-    
-    Alert.alert('Registration Failed', errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
+  const createAccount = async () => {
+    try {
+      setLoading(true);
+      console.log('🚀 Starting account creation process...');
+      
+      // Combine country code and phone number
+      const fullPhoneNumber = `${formData.countryCode}${formData.phone}`;
+      
+      console.log('📝 Account details:', {
+        email: formData.email,
+        phone: fullPhoneNumber,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        passwordLength: formData.password.length,
+        passwordStrength: passwordStrength.strength
+      });
+
+      // Create Supabase account
+      console.log('🔐 Calling Supabase auth.signUp...');
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone_number: fullPhoneNumber,
+            display_name: `${formData.firstName} ${formData.lastName}`,
+          }
+        }
+      });
+
+      console.log('📨 Supabase response:', { data, error });
+
+      if (error) {
+        console.error('❌ Supabase error:', error);
+        
+        // Enhanced error handling with specific messages
+        let errorMessage = 'Unable to create account. Please try again.';
+        let errorType = 'UNKNOWN_ERROR';
+        
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'An account with this email already exists. Please try logging in instead.';
+          errorType = 'EMAIL_EXISTS';
+        } else if (error.message.includes('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+          errorType = 'INVALID_EMAIL';
+        } else if (error.message.includes('Password should be at least')) {
+          errorMessage = 'Your password is too short. Please use at least 6 characters.';
+          errorType = 'PASSWORD_TOO_SHORT';
+        } else if (error.message.includes('Password')) {
+          errorMessage = 'Your password does not meet the security requirements. Please include uppercase, lowercase, numbers, and symbols.';
+          errorType = 'WEAK_PASSWORD';
+        } else if (error.message.includes('network') || error.message.includes('internet')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+          errorType = 'NETWORK_ERROR';
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = 'Too many attempts. Please wait a moment and try again.';
+          errorType = 'RATE_LIMIT';
+        }
+        
+        console.log(`🔍 Error type: ${errorType}`);
+        throw new Error(errorType);
+      }
+
+      if (data.user) {
+        console.log('✅ User created successfully:', data.user.id);
+        await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber);
+      } else {
+        console.error('❌ No user data returned');
+        throw new Error('NO_USER_DATA');
+      }
+    } catch (error) {
+      console.error('💥 Error creating account:', error);
+      
+      // User-friendly error messages based on error type
+      let errorMessage = 'Unable to create account. Please try again.';
+      let showPasswordHelp = false;
+      
+      switch (error.message) {
+        case 'EMAIL_EXISTS':
+          errorMessage = 'An account with this email already exists. Please try logging in instead.';
+          break;
+        case 'INVALID_EMAIL':
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'PASSWORD_TOO_SHORT':
+          errorMessage = 'Your password is too short. Please use at least 6 characters.';
+          showPasswordHelp = true;
+          break;
+        case 'WEAK_PASSWORD':
+          errorMessage = 'Your password does not meet security requirements. Please include uppercase, lowercase, numbers, and symbols.';
+          showPasswordHelp = true;
+          break;
+        case 'NETWORK_ERROR':
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+          break;
+        case 'RATE_LIMIT':
+          errorMessage = 'Too many attempts. Please wait a moment and try again.';
+          break;
+        case 'NO_USER_DATA':
+          errorMessage = 'Account creation failed. Please try again.';
+          break;
+      }
+      
+      Alert.alert(
+        'Registration Failed', 
+        errorMessage,
+        showPasswordHelp ? [
+          {
+            text: 'Fix Password',
+            onPress: () => setShowPasswordFeedback(true)
+          },
+          { text: 'OK' }
+        ] : undefined
+      );
+      
+      if (showPasswordHelp) {
+        setShowPasswordFeedback(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSuccessfulAccountCreation = async (userId: string | undefined, fullPhoneNumber: string) => {
     try {
@@ -558,6 +681,49 @@ const createAccount = async () => {
     </Modal>
   );
 
+  const renderPasswordStrength = () => {
+    if (!formData.password) return null;
+
+    return (
+      <View style={styles.passwordStrengthContainer}>
+        <View style={styles.strengthHeader}>
+          <Text style={styles.strengthLabel}>Password Strength:</Text>
+          <Text style={[styles.strengthValue, { color: getStrengthColor(passwordStrength.strength) }]}>
+            {getStrengthLabel(passwordStrength.strength)}
+          </Text>
+        </View>
+        
+        <View style={styles.strengthBar}>
+          {[1, 2, 3, 4, 5].map((index) => (
+            <View
+              key={index}
+              style={[
+                styles.strengthSegment,
+                {
+                  backgroundColor: index <= passwordStrength.strength 
+                    ? getStrengthColor(passwordStrength.strength)
+                    : '#e0e0e0',
+                },
+              ]}
+            />
+          ))}
+        </View>
+
+        {(showPasswordFeedback || passwordStrength.strength < 3) && passwordStrength.feedback.length > 0 && (
+          <View style={styles.feedbackContainer}>
+            <AlertCircle size={16} color="#ff6b6b" />
+            <Text style={styles.feedbackTitle}>Your password should include:</Text>
+            {passwordStrength.feedback.map((item, index) => (
+              <Text key={index} style={styles.feedbackItem}>
+                • {item}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderFormContent = (step) => {
     switch (step.formType) {
       case 'name':
@@ -574,7 +740,12 @@ const createAccount = async () => {
                 autoCapitalize="words"
               />
             </View>
-            {formErrors.firstName && <Text style={styles.errorText}>{formErrors.firstName}</Text>}
+            {formErrors.firstName && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={16} color="#ff6b6b" />
+                <Text style={styles.errorText}>{formErrors.firstName}</Text>
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <User size={20} color="#3a5dc4" />
@@ -587,7 +758,12 @@ const createAccount = async () => {
                 autoCapitalize="words"
               />
             </View>
-            {formErrors.lastName && <Text style={styles.errorText}>{formErrors.lastName}</Text>}
+            {formErrors.lastName && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={16} color="#ff6b6b" />
+                <Text style={styles.errorText}>{formErrors.lastName}</Text>
+              </View>
+            )}
           </View>
         );
       
@@ -607,7 +783,12 @@ const createAccount = async () => {
                 autoComplete="email"
               />
             </View>
-            {formErrors.email && <Text style={styles.errorText}>{formErrors.email}</Text>}
+            {formErrors.email && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={16} color="#ff6b6b" />
+                <Text style={styles.errorText}>{formErrors.email}</Text>
+              </View>
+            )}
 
             <View style={styles.phoneInputContainer}>
               <Pressable 
@@ -630,7 +811,12 @@ const createAccount = async () => {
                 />
               </View>
             </View>
-            {formErrors.phone && <Text style={styles.errorText}>{formErrors.phone}</Text>}
+            {formErrors.phone && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={16} color="#ff6b6b" />
+                <Text style={styles.errorText}>{formErrors.phone}</Text>
+              </View>
+            )}
             {renderCountryCodeModal()}
           </View>
         );
@@ -654,12 +840,21 @@ const createAccount = async () => {
                 style={styles.eyeButton}
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Text style={styles.eyeButtonText}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </Text>
+                {showPassword ? (
+                  <EyeOff size={20} color="#3a5dc4" />
+                ) : (
+                  <Eye size={20} color="#3a5dc4" />
+                )}
               </Pressable>
             </View>
-            {formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
+            {formErrors.password && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={16} color="#ff6b6b" />
+                <Text style={styles.errorText}>{formErrors.password}</Text>
+              </View>
+            )}
+
+            {renderPasswordStrength()}
 
             <View style={styles.inputContainer}>
               <Lock size={20} color="#3a5dc4" />
@@ -677,15 +872,22 @@ const createAccount = async () => {
                 style={styles.eyeButton}
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               >
-                <Text style={styles.eyeButtonText}>
-                  {showConfirmPassword ? 'Hide' : 'Show'}
-                </Text>
+                {showConfirmPassword ? (
+                  <EyeOff size={20} color="#3a5dc4" />
+                ) : (
+                  <Eye size={20} color="#3a5dc4" />
+                )}
               </Pressable>
             </View>
-            {formErrors.confirmPassword && <Text style={styles.errorText}>{formErrors.confirmPassword}</Text>}
+            {formErrors.confirmPassword && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={16} color="#ff6b6b" />
+                <Text style={styles.errorText}>{formErrors.confirmPassword}</Text>
+              </View>
+            )}
             
             <Text style={styles.passwordHint}>
-              Password must be at least 6 characters long
+              For maximum security, include uppercase, lowercase, numbers, and symbols
             </Text>
           </View>
         );
@@ -894,11 +1096,16 @@ const styles = StyleSheet.create({
     borderColor: '#ff6b6b',
     borderWidth: 1,
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginLeft: 8,
+  },
   errorText: {
     color: '#ff6b6b',
     fontSize: isSmallScreen ? 12 : 13,
-    marginTop: 4,
-    marginLeft: 8,
   },
   // Phone input styles
   phoneInputContainer: {
@@ -995,13 +1202,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eyeButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    padding: 4,
   },
-  eyeButtonText: {
-    color: '#3a5dc4',
+  passwordStrengthContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  strengthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  strengthLabel: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#666',
+  },
+  strengthValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  strengthBar: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 8,
+  },
+  strengthSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  feedbackContainer: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff6b6b',
+  },
+  feedbackTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff6b6b',
+    marginBottom: 4,
+  },
+  feedbackItem: {
+    fontSize: 11,
+    color: '#666',
+    marginLeft: 8,
   },
   passwordHint: {
     fontSize: 12,
