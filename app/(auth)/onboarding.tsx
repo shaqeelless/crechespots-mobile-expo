@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,57 @@ import {
   Alert,
   Image,
   Animated,
+  ScrollView,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowRight, User, Mail, Phone, Camera, Check } from 'lucide-react-native';
+import { ArrowRight, User, Mail, Phone, Camera, Check, Lock, ChevronDown } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+
+// Preload images - reference them once
+const preloadedImages = {
+  onboarding1: require('@/assets/images/Onboardin-1.png'),
+  onboarding2: require('@/assets/images/Onboardin-2.png'),
+  splashScreen: require('@/assets/images/SplashScreen.png'),
+};
+
+// Country codes data
+const countryCodes = [
+  { code: '+1', flag: '🇺🇸', country: 'United States' },
+  { code: '+44', flag: '🇬🇧', country: 'United Kingdom' },
+  { code: '+61', flag: '🇦🇺', country: 'Australia' },
+  { code: '+64', flag: '🇳🇿', country: 'New Zealand' },
+  { code: '+27', flag: '🇿🇦', country: 'South Africa' },
+  { code: '+91', flag: '🇮🇳', country: 'India' },
+  { code: '+86', flag: '🇨🇳', country: 'China' },
+  { code: '+81', flag: '🇯🇵', country: 'Japan' },
+  { code: '+82', flag: '🇰🇷', country: 'South Korea' },
+  { code: '+65', flag: '🇸🇬', country: 'Singapore' },
+  { code: '+60', flag: '🇲🇾', country: 'Malaysia' },
+  { code: '+971', flag: '🇦🇪', country: 'UAE' },
+  { code: '+966', flag: '🇸🇦', country: 'Saudi Arabia' },
+  { code: '+20', flag: '🇪🇬', country: 'Egypt' },
+  { code: '+234', flag: '🇳🇬', country: 'Nigeria' },
+  { code: '+254', flag: '🇰🇪', country: 'Kenya' },
+  { code: '+33', flag: '🇫🇷', country: 'France' },
+  { code: '+49', flag: '🇩🇪', country: 'Germany' },
+  { code: '+39', flag: '🇮🇹', country: 'Italy' },
+  { code: '+34', flag: '🇪🇸', country: 'Spain' },
+  { code: '+31', flag: '🇳🇱', country: 'Netherlands' },
+  { code: '+41', flag: '🇨🇭', country: 'Switzerland' },
+  { code: '+46', flag: '🇸🇪', country: 'Sweden' },
+  { code: '+47', flag: '🇳🇴', country: 'Norway' },
+  { code: '+45', flag: '🇩🇰', country: 'Denmark' },
+  { code: '+55', flag: '🇧🇷', country: 'Brazil' },
+  { code: '+52', flag: '🇲🇽', country: 'Mexico' },
+  { code: '+51', flag: '🇵🇪', country: 'Peru' },
+  { code: '+54', flag: '🇦🇷', country: 'Argentina' },
+  { code: '+56', flag: '🇨🇱', country: 'Chile' },
+];
 
 const onboardingSteps = [
   {
@@ -24,7 +69,7 @@ const onboardingSteps = [
     description: 'Browse verified creches and daycares in your area with detailed profiles, photos, and parent reviews.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
-    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
+    image: preloadedImages.onboarding1,
   },
   {
     id: 2,
@@ -33,7 +78,7 @@ const onboardingSteps = [
     description: 'All childcare providers are thoroughly vetted with background checks, certifications, and safety inspections.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
-    image: require('@/assets/images/Onboardin-2.png'), // Add your image path
+    image: preloadedImages.onboarding2,
   },
   {
     id: 3,
@@ -42,7 +87,7 @@ const onboardingSteps = [
     description: 'Submit applications to multiple creches instantly. Track your progress and get notifications when accepted.',
     backgroundColor: '#f4fcfe',
     color: '#3a5dc4',
-    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
+    image: preloadedImages.onboarding1,
   },
   {
     id: 4,
@@ -53,29 +98,29 @@ const onboardingSteps = [
     color: '#3a5dc4',
     isForm: true,
     formType: 'name',
-    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
+    image: preloadedImages.onboarding1,
   },
   {
     id: 5,
-    title: 'Add a profile photo',
-    subtitle: 'Let creches see who you are',
-    description: 'A profile photo helps build trust with childcare providers. You can skip this step if you prefer.',
-    backgroundColor: '#f4fcfe',
-    color: '#ffffff',
-    isForm: true,
-    formType: 'photo',
-    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
-  },
-  {
-    id: 6,
     title: 'Contact information',
     subtitle: 'How can creches reach you?',
     description: 'We need your email and phone number so creches can contact you about applications.',
     backgroundColor: '#f4fcfe',
-    color: '#ffffff',
+    color: '#3a5dc4',
     isForm: true,
     formType: 'contact',
-    image: require('@/assets/images/Onboardin-1.png'), // Add your image path
+    image: preloadedImages.onboarding1,
+  },
+  {
+    id: 6,
+    title: 'Create Password',
+    subtitle: 'Secure your account',
+    description: 'Create a strong password to protect your account and personal information.',
+    backgroundColor: '#f4fcfe',
+    color: '#3a5dc4',
+    isForm: true,
+    formType: 'password',
+    image: preloadedImages.onboarding1,
   },
 ];
 
@@ -86,12 +131,40 @@ export default function OnboardingScreen() {
     lastName: '',
     email: '',
     phone: '',
-    profilePhoto: null,
+    countryCode: '+1', // Default country code
+    password: '',
+    confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showCountryCodeModal, setShowCountryCodeModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const imageScale = useRef(new Animated.Value(1)).current;
+  const imageOpacity = useRef(new Animated.Value(1)).current;
   const router = useRouter();
+
+  // Preload and cache images
+  useEffect(() => {
+    const preloadImages = async () => {
+      try {
+        const imageUris = [
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding1).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding2).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.splashScreen).uri),
+        ];
+        
+        await Promise.all(imageUris);
+        setImagesLoaded(true);
+      } catch (error) {
+        console.log('Image preloading error:', error);
+        setImagesLoaded(true); // Continue anyway even if preloading fails
+      }
+    };
+
+    preloadImages();
+  }, []);
 
   const handleNext = async () => {
     const currentStep = onboardingSteps[currentIndex];
@@ -109,6 +182,35 @@ export default function OnboardingScreen() {
           return;
         }
         
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          Alert.alert('Invalid Email', 'Please enter a valid email address');
+          return;
+        }
+
+        // Phone number validation (basic - just check if it has numbers)
+        const phoneRegex = /^[0-9]+$/;
+        if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
+          Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+          return;
+        }
+      } else if (currentStep.formType === 'password') {
+        if (!formData.password.trim() || !formData.confirmPassword.trim()) {
+          Alert.alert('Required', 'Please enter and confirm your password');
+          return;
+        }
+        
+        if (formData.password.length < 6) {
+          Alert.alert('Weak Password', 'Password must be at least 6 characters long');
+          return;
+        }
+        
+        if (formData.password !== formData.confirmPassword) {
+          Alert.alert('Password Mismatch', 'Passwords do not match. Please try again.');
+          return;
+        }
+        
         // Create account on final step
         await createAccount();
         return;
@@ -116,21 +218,35 @@ export default function OnboardingScreen() {
     }
 
     if (currentIndex < onboardingSteps.length - 1) {
-      // Animate image scale
+      // Smooth image transition
       Animated.sequence([
-        Animated.timing(imageScale, {
-          toValue: 0.8,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(imageScale, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
+        Animated.parallel([
+          Animated.timing(imageOpacity, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(imageScale, {
+            toValue: 0.9,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(imageOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(imageScale, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]),
       ]).start();
 
-      // Animate content fade
+      // Content fade animation
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -152,49 +268,131 @@ export default function OnboardingScreen() {
     try {
       setLoading(true);
       
+      // Combine country code and phone number
+      const fullPhoneNumber = `${formData.countryCode}${formData.phone}`;
+      
+      console.log('Attempting to create account with:', {
+        email: formData.email,
+        phone: fullPhoneNumber,
+        firstName: formData.firstName,
+        lastName: formData.lastName
+      });
+
       // Create Supabase account
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
-        password: 'temp_password_' + Math.random().toString(36).substring(7), // Temporary password
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone_number: fullPhoneNumber,
+            display_name: `${formData.firstName} ${formData.lastName}`,
+          }
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase auth error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        throw error;
+      }
+
+      console.log('Auth response:', data);
 
       if (data.user) {
-        // Create user profile
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: data.user.id,
-              email: formData.email,
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              phone_number: formData.phone,
-              display_name: `${formData.firstName} ${formData.lastName}`,
-              profile_picture_url: formData.profilePhoto || 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png',
-            },
-          ]);
+        console.log('User created successfully:', data.user.id);
+        
+        try {
+          // Create user profile in the public users table
+          const { data: profileData, error: profileError } = await supabase
+            .from('users')
+            .insert([
+              {
+                id: data.user.id,
+                email: formData.email,
+                first_name: formData.firstName,
+                last_name: formData.lastName,
+                phone_number: fullPhoneNumber,
+                country_code: formData.countryCode,
+                display_name: `${formData.firstName} ${formData.lastName}`,
+                profile_picture_url: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+            ])
+            .select();
 
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
+          if (profileError) {
+            console.error('Error creating user profile:', profileError);
+            console.error('Profile error details:', {
+              message: profileError.message,
+              details: profileError.details,
+              hint: profileError.hint,
+              code: profileError.code
+            });
+            
+            // Check if it's a duplicate error
+            if (profileError.code === '23505') {
+              Alert.alert('Error', 'A user with this email already exists. Please use a different email or try logging in.');
+              return;
+            }
+            
+            // For other profile errors, we can still proceed since auth was successful
+            console.warn('Profile creation failed but auth succeeded. User can update profile later.');
+          } else {
+            console.log('Profile created successfully:', profileData);
+          }
+
+          // Show success message
+          Alert.alert(
+            'Account Created Successfully!',
+            'Please check your email to verify your account, then you can sign in.',
+            [
+              {
+                text: 'Go to Login',
+                onPress: () => router.replace('/(auth)/login'),
+              },
+            ]
+          );
+
+        } catch (profileException) {
+          console.error('Exception during profile creation:', profileException);
+          // Even if profile creation fails, we can still show success since auth worked
+          Alert.alert(
+            'Account Created!',
+            'Your account was created successfully! You can now sign in and complete your profile later.',
+            [
+              {
+                text: 'Go to Login',
+                onPress: () => router.replace('/(auth)/login'),
+              },
+            ]
+          );
         }
-
-        // Show verification screen
-        Alert.alert(
-          'Account Created!',
-          'Please check your email to verify your account, then you can sign in.',
-          [
-            {
-              text: 'Go to Login',
-              onPress: () => router.replace('/(auth)/login'),
-            },
-          ]
-        );
+      } else {
+        throw new Error('No user data returned from authentication');
       }
     } catch (error) {
       console.error('Error creating account:', error);
-      Alert.alert('Error', 'Failed to create account. Please try again.');
+      
+      // More specific error messages based on the error type
+      if (error.message?.includes('User already registered')) {
+        Alert.alert('Account Exists', 'An account with this email already exists. Please try logging in instead.');
+      } else if (error.message?.includes('Invalid email')) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      } else if (error.message?.includes('Password')) {
+        Alert.alert('Weak Password', 'Please choose a stronger password.');
+      } else {
+        Alert.alert(
+          'Registration Failed', 
+          'Unable to create account. Please check your internet connection and try again. If the problem persists, contact support.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -202,6 +400,11 @@ export default function OnboardingScreen() {
 
   const handleSkip = () => {
     router.push('/(auth)/login');
+  };
+
+  const selectCountryCode = (country) => {
+    setFormData({ ...formData, countryCode: country.code });
+    setShowCountryCodeModal(false);
   };
 
   const renderDots = () => {
@@ -223,6 +426,44 @@ export default function OnboardingScreen() {
     );
   };
 
+  const renderCountryCodeModal = () => (
+    <Modal
+      visible={showCountryCodeModal}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowCountryCodeModal(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Country Code</Text>
+            <Pressable 
+              style={styles.closeButton}
+              onPress={() => setShowCountryCodeModal(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={countryCodes}
+            keyExtractor={(item) => item.code}
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.countryItem}
+                onPress={() => selectCountryCode(item)}
+              >
+                <Text style={styles.countryFlag}>{item.flag}</Text>
+                <Text style={styles.countryCode}>{item.code}</Text>
+                <Text style={styles.countryName}>{item.country}</Text>
+              </Pressable>
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+
   const renderFormContent = (step) => {
     switch (step.formType) {
       case 'name':
@@ -233,7 +474,7 @@ export default function OnboardingScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="First Name"
-                placeholderTextColor="#3a5dc4"
+                placeholderTextColor="#666"
                 value={formData.firstName}
                 onChangeText={(text) => setFormData({ ...formData, firstName: text })}
                 autoCapitalize="words"
@@ -244,33 +485,12 @@ export default function OnboardingScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Last Name"
-                placeholderTextColor="#3a5dc4"
+                placeholderTextColor="#666"
                 value={formData.lastName}
                 onChangeText={(text) => setFormData({ ...formData, lastName: text })}
                 autoCapitalize="words"
               />
             </View>
-          </View>
-        );
-      
-      case 'photo':
-        return (
-          <View style={styles.photoContainer}>
-            <View style={styles.photoPlaceholder}>
-              {formData.profilePhoto ? (
-                <Image source={{ uri: formData.profilePhoto }} style={styles.profileImage} />
-              ) : (
-                <Camera size={48} color="#3a5dc4" />
-              )}
-            </View>
-            <Pressable style={styles.photoButton}>
-              <Text style={styles.photoButtonText}>
-                {formData.profilePhoto ? 'Change Photo' : 'Add Photo'}
-              </Text>
-            </Pressable>
-            <Pressable onPress={handleNext}>
-              <Text style={styles.skipText}>Skip for now</Text>
-            </Pressable>
           </View>
         );
       
@@ -282,24 +502,87 @@ export default function OnboardingScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Email Address"
-                placeholderTextColor="#3a5dc4"
+                placeholderTextColor="#666"
                 value={formData.email}
                 onChangeText={(text) => setFormData({ ...formData, email: text })}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
               />
             </View>
+            <View style={styles.phoneInputContainer}>
+              <Pressable 
+                style={styles.countryCodeSelector}
+                onPress={() => setShowCountryCodeModal(true)}
+              >
+                <Text style={styles.countryCodeText}>{formData.countryCode}</Text>
+                <ChevronDown size={16} color="#3a5dc4" />
+              </Pressable>
+              <View style={styles.phoneInput}>
+                <Phone size={20} color="#3a5dc4" />
+                <TextInput
+                  style={styles.phoneNumberInput}
+                  placeholder="Phone Number"
+                  placeholderTextColor="#666"
+                  value={formData.phone}
+                  onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                />
+              </View>
+            </View>
+            {renderCountryCodeModal()}
+          </View>
+        );
+      
+      case 'password':
+        return (
+          <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
-              <Phone size={20} color="#3a5dc4" />
+              <Lock size={20} color="#3a5dc4" />
               <TextInput
                 style={styles.input}
-                placeholder="Phone Number"
-                placeholderTextColor="#3a5dc4"
-                value={formData.phone}
-                onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                keyboardType="phone-pad"
+                placeholder="Create Password"
+                placeholderTextColor="#666"
+                value={formData.password}
+                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="new-password"
               />
+              <Pressable 
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Text style={styles.eyeButtonText}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </Text>
+              </Pressable>
             </View>
+            <View style={styles.inputContainer}>
+              <Lock size={20} color="#3a5dc4" />
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm Password"
+                placeholderTextColor="#666"
+                value={formData.confirmPassword}
+                onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                autoComplete="new-password"
+              />
+              <Pressable 
+                style={styles.eyeButton}
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                <Text style={styles.eyeButtonText}>
+                  {showConfirmPassword ? 'Hide' : 'Show'}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.passwordHint}>
+              Password must be at least 6 characters long
+            </Text>
           </View>
         );
       
@@ -316,9 +599,10 @@ export default function OnboardingScreen() {
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('@/assets/images/SplashScreen.png')}
+            source={preloadedImages.splashScreen}
             style={styles.logoImage}
             resizeMode="contain"
+            fadeDuration={0}
           />
         </View>
         
@@ -328,35 +612,51 @@ export default function OnboardingScreen() {
         </Pressable>
       </View>
 
-      {/* Onboarding Image */}
+      {/* Onboarding Image with Better Loading */}
       <Animated.View 
         style={[
           styles.imageContainer,
-          { transform: [{ scale: imageScale }] }
+          { 
+            transform: [{ scale: imageScale }],
+            opacity: imageOpacity 
+          }
         ]}
       >
         <Image 
           source={currentStep.image}
           style={styles.onboardingImage}
           resizeMode="contain"
+          fadeDuration={0}
         />
+        {/* Loading skeleton - only shows briefly if images aren't preloaded yet */}
+        {!imagesLoaded && (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.placeholderText}>Loading...</Text>
+          </View>
+        )}
       </Animated.View>
 
       {/* Content */}
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <Text style={[styles.title, { color: currentStep.color }]}>
-          {currentStep.title}
-        </Text>
-        
-        <Text style={[styles.subtitle, { color: currentStep.color }]}>
-          {currentStep.subtitle}
-        </Text>
+        <ScrollView 
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={[styles.title, { color: currentStep.color }]}>
+            {currentStep.title}
+          </Text>
+          
+          <Text style={[styles.subtitle, { color: currentStep.color }]}>
+            {currentStep.subtitle}
+          </Text>
 
-        <Text style={[styles.description, { color: currentStep.color }]}>
-          {currentStep.description}
-        </Text>
+          <Text style={[styles.description, { color: currentStep.color }]}>
+            {currentStep.description}
+          </Text>
 
-        {currentStep.isForm && renderFormContent(currentStep)}
+          {currentStep.isForm && renderFormContent(currentStep)}
+        </ScrollView>
       </Animated.View>
 
       {/* Footer */}
@@ -370,150 +670,241 @@ export default function OnboardingScreen() {
         >
           <Text style={styles.nextButtonText}>
             {loading ? 'Creating Account...' : 
-             currentStep.formType === 'contact' ? 'Create Account' : 
-             currentStep.formType === 'photo' ? 'Continue' : 'Next'}
+             currentStep.formType === 'password' ? 'Create Account' : 'Next'}
           </Text>
-          {!loading && <ArrowRight size={20} color="#3a5dc4" />}
+          {!loading && <ArrowRight size={20} color="#ffffff" />}
         </Pressable>
       </View>
     </View>
   );
 }
 
+// ... (styles remain the same as previous version)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
+    paddingTop: isSmallScreen ? 40 : 60,
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    position: 'relative',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: isSmallScreen ? 10 : 20,
   },
   logoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    flex: 1,
+    alignItems: 'flex-start',
   },
   logoImage: {
-    width: 200,
-    height: 60,
+    width: isSmallScreen ? 160 : 200,
+    height: isSmallScreen ? 45 : 60,
   },
   skipButton: {
-    position: 'absolute',
-    top: 0,
-    right: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(58, 93, 196, 0.1)',
   },
   skipButtonText: {
-    color: '#ffffff',
+    color: '#3a5dc4',
     fontSize: 14,
     fontWeight: '600',
   },
   imageContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: isSmallScreen ? 10 : 20,
     paddingHorizontal: 20,
+    height: isSmallScreen ? 150 : 200,
   },
   onboardingImage: {
-    width: width * 0.8,
-    height: 200,
-    maxHeight: 200,
+    width: width * 0.7,
+    height: '100%',
+    maxHeight: isSmallScreen ? 150 : 200,
+  },
+  imagePlaceholder: {
+    position: 'absolute',
+    width: width * 0.7,
+    height: '100%',
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  placeholderText: {
+    color: '#666',
+    fontSize: 14,
   },
   content: {
     flex: 1,
-    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingVertical: 10,
   },
   title: {
-    fontSize: 28,
+    fontSize: isSmallScreen ? 24 : 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: isSmallScreen ? 8 : 12,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: isSmallScreen ? 12 : 16,
   },
   description: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : 16,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: isSmallScreen ? 20 : 24,
     opacity: 0.9,
-    marginBottom: 32,
+    marginBottom: isSmallScreen ? 24 : 32,
   },
   formContainer: {
     width: '100%',
-    gap: 16,
+    gap: isSmallScreen ? 12 : 16,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: isSmallScreen ? 12 : 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(58, 93, 196, 0.3)',
   },
   input: {
     flex: 1,
     marginLeft: 12,
-    fontSize: 16,
-    color: '#ffffff',
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#333',
   },
-  photoContainer: {
+  // Phone input styles
+  phoneInputContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-  },
-  photoPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  photoButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(58, 93, 196, 0.3)',
+    overflow: 'hidden',
   },
-  photoButtonText: {
-    color: '#ffffff',
+  countryCodeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: isSmallScreen ? 12 : 16,
+    backgroundColor: 'rgba(58, 93, 196, 0.1)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(58, 93, 196, 0.3)',
+    gap: 8,
+  },
+  countryCodeText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#3a5dc4',
+    fontWeight: '600',
+  },
+  phoneInput: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: isSmallScreen ? 12 : 16,
+  },
+  phoneNumberInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#333',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
+    color: '#3a5dc4',
     fontSize: 16,
     fontWeight: '600',
   },
-  skipText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    textDecorationLine: 'underline',
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 12,
+  },
+  countryFlag: {
+    fontSize: 20,
+  },
+  countryCode: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    width: 60,
+  },
+  countryName: {
+    fontSize: 16,
+    color: '#666',
+    flex: 1,
+  },
+  eyeButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  eyeButtonText: {
+    color: '#3a5dc4',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  passwordHint: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   footer: {
-    paddingHorizontal: 32,
-    paddingBottom: 50,
+    paddingHorizontal: 24,
+    paddingBottom: isSmallScreen ? 30 : 50,
   },
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: isSmallScreen ? 20 : 32,
   },
   dot: {
     height: 8,
@@ -521,11 +912,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   nextButton: {
-    backgroundColor: '#bd84f6',
+    backgroundColor: '#3a5dc4',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: isSmallScreen ? 14 : 16,
     paddingHorizontal: 32,
     borderRadius: 12,
     gap: 8,
@@ -535,7 +926,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: isSmallScreen ? 15 : 16,
     fontWeight: '600',
   },
 });
