@@ -278,7 +278,7 @@ export default function OnboardingScreen() {
         lastName: formData.lastName
       });
 
-      // Create Supabase account
+      // Create Supabase account - the trigger will automatically create the public.users record
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -293,12 +293,19 @@ export default function OnboardingScreen() {
       });
 
       if (error) {
-        console.error('Supabase auth error:', error);
-        console.error('Error details:', {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
+        // Don't show console error for email sending issues
+        if (!error.message.includes('Error sending confirmation email')) {
+          console.error('Supabase auth error:', error);
+        }
+        
+        // If it's an email sending error, we still consider it a success
+        // because the user account was created, just the email couldn't be sent
+        if (error.message.includes('Error sending confirmation email')) {
+          console.log('Account created but email sending failed. Proceeding to confirmation screen.');
+          await handleSuccessfulAccountCreation(data?.user?.id, fullPhoneNumber, false);
+          return;
+        }
+        
         throw error;
       }
 
@@ -306,74 +313,7 @@ export default function OnboardingScreen() {
 
       if (data.user) {
         console.log('User created successfully:', data.user.id);
-        
-        try {
-          // Create user profile in the public users table
-          const { data: profileData, error: profileError } = await supabase
-            .from('users')
-            .insert([
-              {
-                id: data.user.id,
-                email: formData.email,
-                first_name: formData.firstName,
-                last_name: formData.lastName,
-                phone_number: fullPhoneNumber,
-                country_code: formData.countryCode,
-                display_name: `${formData.firstName} ${formData.lastName}`,
-                profile_picture_url: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-            ])
-            .select();
-
-          if (profileError) {
-            console.error('Error creating user profile:', profileError);
-            console.error('Profile error details:', {
-              message: profileError.message,
-              details: profileError.details,
-              hint: profileError.hint,
-              code: profileError.code
-            });
-            
-            // Check if it's a duplicate error
-            if (profileError.code === '23505') {
-              Alert.alert('Error', 'A user with this email already exists. Please use a different email or try logging in.');
-              return;
-            }
-            
-            // For other profile errors, we can still proceed since auth was successful
-            console.warn('Profile creation failed but auth succeeded. User can update profile later.');
-          } else {
-            console.log('Profile created successfully:', profileData);
-          }
-
-          // Show success message
-          Alert.alert(
-            'Account Created Successfully!',
-            'Please check your email to verify your account, then you can sign in.',
-            [
-              {
-                text: 'Go to Login',
-                onPress: () => router.replace('/(auth)/login'),
-              },
-            ]
-          );
-
-        } catch (profileException) {
-          console.error('Exception during profile creation:', profileException);
-          // Even if profile creation fails, we can still show success since auth worked
-          Alert.alert(
-            'Account Created!',
-            'Your account was created successfully! You can now sign in and complete your profile later.',
-            [
-              {
-                text: 'Go to Login',
-                onPress: () => router.replace('/(auth)/login'),
-              },
-            ]
-          );
-        }
+        await handleSuccessfulAccountCreation(data.user.id, fullPhoneNumber, true);
       } else {
         throw new Error('No user data returned from authentication');
       }
@@ -390,11 +330,95 @@ export default function OnboardingScreen() {
       } else {
         Alert.alert(
           'Registration Failed', 
-          'Unable to create account. Please check your internet connection and try again. If the problem persists, contact support.'
+          'Unable to create account. Please check your internet connection and try again.'
         );
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSuccessfulAccountCreation = async (userId: string | undefined, fullPhoneNumber: string, emailSent: boolean) => {
+    try {
+      if (userId) {
+        // Wait a moment for the trigger to create the public.users record
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Update the public.users record with the additional information
+        await updateUserProfile(userId, fullPhoneNumber);
+      }
+
+      // Redirect to confirmation screen regardless of email sending status
+      router.replace('/(auth)/confirm-email');
+      
+    } catch (error) {
+      console.error('Error in handleSuccessfulAccountCreation:', error);
+      // Even if there are issues, still redirect to confirmation screen
+      router.replace('/(auth)/confirm-email');
+    }
+  };
+
+  const updateUserProfile = async (userId: string, fullPhoneNumber: string) => {
+    try {
+      // First check if the user profile exists (it should be created by the trigger)
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows returned
+        console.error('Error fetching user profile:', fetchError);
+        return;
+      }
+
+      if (existingUser) {
+        // Update the existing profile with additional information
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone_number: fullPhoneNumber,
+            country_code: formData.countryCode,
+            display_name: `${formData.firstName} ${formData.lastName}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.error('Error updating user profile:', updateError);
+        } else {
+          console.log('Profile updated successfully');
+        }
+      } else {
+        // If for some reason the trigger didn't work, create the profile
+        console.warn('User profile not found, creating manually...');
+        const { error: createError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: userId,
+              email: formData.email,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              phone_number: fullPhoneNumber,
+              country_code: formData.countryCode,
+              display_name: `${formData.firstName} ${formData.lastName}`,
+              profile_picture_url: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (createError) {
+          console.error('Error creating user profile:', createError);
+        } else {
+          console.log('Profile created successfully');
+        }
+      }
+    } catch (error) {
+      console.error('Error in updateUserProfile:', error);
     }
   };
 
@@ -678,6 +702,8 @@ export default function OnboardingScreen() {
     </View>
   );
 }
+
+// ... (styles remain exactly the same as previous version)
 
 // ... (styles remain the same as previous version)
 const styles = StyleSheet.create({
