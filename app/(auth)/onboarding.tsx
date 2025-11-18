@@ -159,6 +159,8 @@ export default function OnboardingScreen() {
           Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding2).uri),
           Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding3).uri),
           Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding4).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding5).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.onboarding6).uri),
           Image.prefetch(Image.resolveAssetSource(preloadedImages.splashScreen).uri),
         ];
         
