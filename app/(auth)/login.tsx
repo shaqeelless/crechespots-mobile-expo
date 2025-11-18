@@ -48,10 +48,7 @@ export default function LoginScreen() {
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#374151" />
-        </Pressable>
-        
+
         <View style={styles.logoContainer}>
           <Image 
             source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
@@ -103,7 +100,7 @@ export default function LoginScreen() {
         </Pressable>
 
         {/* Register Link */}
-        <Pressable onPress={() => router.push('/(auth)/register')}>
+        <Pressable onPress={() => router.push('/(auth)/onboarding')}>
           <Text style={styles.registerText}>
             Don't have an account? <Text style={styles.registerLink}>Sign Up</Text>
           </Text>
