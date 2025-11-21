@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -34,9 +35,17 @@ import {
   Heart,
   Pill,
   CalendarClock,
+  Star,
+  Award,
+  Target,
+  BarChart3,
+  Activity,
+  Shield,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface Child {
   id: string;
@@ -186,7 +195,7 @@ export default function ChildDetailsScreen() {
         *,
         creches(name, header_image, address)
       `)
-      .eq('application_id', applications[0]?.id) // Assuming one application per student
+      .eq('application_id', applications[0]?.id)
       .order('created_at', { ascending: false });
 
     if (!error) setStudents(data || []);
@@ -201,7 +210,7 @@ export default function ChildDetailsScreen() {
       .select('*')
       .in('student_id', studentIds)
       .order('attendance_date', { ascending: false })
-      .limit(10); // Last 10 attendance records
+      .limit(10);
 
     if (!error) setAttendance(data || []);
   };
@@ -303,18 +312,30 @@ export default function ChildDetailsScreen() {
     }).format(amount || 0);
   };
 
+  const getAttendancePercentage = () => {
+    if (attendance.length === 0) return 0;
+    const presentCount = attendance.filter(a => a.status === 'Present').length;
+    return Math.round((presentCount / attendance.length) * 100);
+  };
+
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 80) return '#22c55e';
+    if (percentage >= 60) return '#f59e0b';
+    return '#ef4444';
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#374151" />
+            <ArrowLeft size={24} color="#ffffff" />
           </Pressable>
           <Text style={styles.headerTitle}>Child Details</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#bd84f6" />
+          <ActivityIndicator size="large" color="#8b5cf6" />
           <Text style={styles.loadingText}>Loading child details...</Text>
         </View>
       </View>
@@ -326,7 +347,7 @@ export default function ChildDetailsScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#374151" />
+            <ArrowLeft size={24} color="#ffffff" />
           </Pressable>
           <Text style={styles.headerTitle}>Child Details</Text>
           <View style={styles.placeholder} />
@@ -344,81 +365,167 @@ export default function ChildDetailsScreen() {
 
   const renderOverviewSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Overview</Text>
-      
-      {/* Child Basic Info */}
-      <View style={styles.infoCard}>
-        <View style={styles.infoRow}>
-          <Baby size={18} color="#374151" />
-          <Text style={styles.infoLabel}>Full Name:</Text>
-          <Text style={styles.infoValue}>
-            {child.first_name} {child.last_name}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Calendar size={18} color="#374151" />
-          <Text style={styles.infoLabel}>Date of Birth:</Text>
-          <Text style={styles.infoValue}>
-            {new Date(child.date_of_birth).toLocaleDateString()} 
-            ({calculateAge(child.date_of_birth)} years old)
-          </Text>
-        </View>
-        {child.gender && (
-          <View style={styles.infoRow}>
-            <User size={18} color="#374151" />
-            <Text style={styles.infoLabel}>Gender:</Text>
-            <Text style={styles.infoValue}>{child.gender}</Text>
+      {/* Hero Section */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroContent}>
+          <View style={styles.avatarContainer}>
+            {child.profile_picture_url ? (
+              <Image
+                source={{ uri: child.profile_picture_url }}
+                style={styles.heroAvatar}
+              />
+            ) : (
+              <View style={styles.heroAvatar}>
+                <Text style={styles.heroAvatarText}>
+                  {child.first_name.charAt(0)}{child.last_name.charAt(0)}
+                </Text>
+              </View>
+            )}
           </View>
-        )}
+          <View style={styles.heroInfo}>
+            <Text style={styles.heroName}>
+              {child.first_name} {child.last_name}
+            </Text>
+            <Text style={styles.heroAge}>
+              {calculateAge(child.date_of_birth)} years old • {child.gender}
+            </Text>
+            <Text style={styles.heroSince}>
+              Member since {new Date(child.created_at).getFullYear()}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.heroStats}>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatNumber}>{students.length}</Text>
+            <Text style={styles.heroStatLabel}>Active</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatNumber}>{applications.length}</Text>
+            <Text style={styles.heroStatLabel}>Applications</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatNumber}>{getAttendancePercentage()}%</Text>
+            <Text style={styles.heroStatLabel}>Attendance</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Quick Stats */}
+      <View style={styles.statsGrid}>
+        <View style={[styles.statCard, { backgroundColor: '#8b5cf6' }]}>
+          <View style={styles.statIconContainer}>
+            <School size={20} color="#ffffff" />
+          </View>
+          <Text style={styles.statNumber}>{students.length}</Text>
+          <Text style={styles.statLabel}>Enrolled</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: '#06b6d4' }]}>
+          <View style={styles.statIconContainer}>
+            <CalendarClock size={20} color="#ffffff" />
+          </View>
+          <Text style={styles.statNumber}>{getAttendancePercentage()}%</Text>
+          <Text style={styles.statLabel}>Attendance</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
+          <View style={styles.statIconContainer}>
+            <FileText size={20} color="#ffffff" />
+          </View>
+          <Text style={styles.statNumber}>{applications.length}</Text>
+          <Text style={styles.statLabel}>Applications</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: '#f59e0b' }]}>
+          <View style={styles.statIconContainer}>
+            <BookOpen size={20} color="#ffffff" />
+          </View>
+          <Text style={styles.statNumber}>{applicationNotes.length}</Text>
+          <Text style={styles.statLabel}>Notes</Text>
+        </View>
+      </View>
+
+      {/* Progress Section */}
+      <View style={styles.progressSection}>
+        <Text style={styles.sectionTitle}>Progress Overview</Text>
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeader}>
+            <Activity size={20} color="#374151" />
+            <Text style={styles.progressTitle}>Attendance Rate</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBar, 
+                { 
+                  width: `${getAttendancePercentage()}%`,
+                  backgroundColor: getProgressColor(getAttendancePercentage())
+                }
+              ]} 
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {getAttendancePercentage()}% present in the last {attendance.length} days
+          </Text>
+        </View>
       </View>
 
       {/* Medical Summary */}
       {(child.allergies || child.special_needs || child.medical_conditions) && (
-        <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>Medical Summary</Text>
-          {child.allergies && (
-            <View style={styles.infoRow}>
-              <AlertCircle size={18} color="#ef4444" />
-              <Text style={styles.infoLabel}>Allergies:</Text>
-              <Text style={styles.infoValue}>{child.allergies}</Text>
+        <View style={styles.medicalSummary}>
+          <Text style={styles.sectionTitle}>Health Summary</Text>
+          <View style={styles.medicalSummaryCard}>
+            <View style={styles.medicalSummaryHeader}>
+              <Heart size={20} color="#ef4444" />
+              <Text style={styles.medicalSummaryTitle}>Health Alerts</Text>
             </View>
-          )}
-          {child.special_needs && (
-            <View style={styles.infoRow}>
-              <Heart size={18} color="#3b82f6" />
-              <Text style={styles.infoLabel}>Special Needs:</Text>
-              <Text style={styles.infoValue}>{child.special_needs}</Text>
-            </View>
-          )}
-          {child.medical_conditions && (
-            <View style={styles.infoRow}>
-              <Pill size={18} color="#8b5cf6" />
-              <Text style={styles.infoLabel}>Medical Conditions:</Text>
-              <Text style={styles.infoValue}>{child.medical_conditions}</Text>
-            </View>
-          )}
+            {child.allergies && (
+              <View style={styles.medicalItem}>
+                <AlertCircle size={16} color="#f59e0b" />
+                <Text style={styles.medicalText}>Allergies: {child.allergies}</Text>
+              </View>
+            )}
+            {child.special_needs && (
+              <View style={styles.medicalItem}>
+                <Shield size={16} color="#06b6d4" />
+                <Text style={styles.medicalText}>Special Needs: {child.special_needs}</Text>
+              </View>
+            )}
+            {child.medical_conditions && (
+              <View style={styles.medicalItem}>
+                <Pill size={16} color="#8b5cf6" />
+                <Text style={styles.medicalText}>Conditions: {child.medical_conditions}</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
-      {/* Quick Stats */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{applications.length}</Text>
-          <Text style={styles.statLabel}>Applications</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{students.length}</Text>
-          <Text style={styles.statLabel}>Active Enrollments</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {attendance.filter(a => a.status === 'Present').length}
-          </Text>
-          <Text style={styles.statLabel}>Days Present</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{applicationNotes.length}</Text>
-          <Text style={styles.statLabel}>Notes</Text>
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.actionsGrid}>
+          <Pressable style={styles.actionButton} onPress={() => setActiveSection('applications')}>
+            <View style={[styles.actionIcon, { backgroundColor: '#8b5cf6' }]}>
+              <FileText size={20} color="#ffffff" />
+            </View>
+            <Text style={styles.actionText}>Applications</Text>
+          </Pressable>
+          <Pressable style={styles.actionButton} onPress={() => setActiveSection('attendance')}>
+            <View style={[styles.actionIcon, { backgroundColor: '#06b6d4' }]}>
+              <CalendarClock size={20} color="#ffffff" />
+            </View>
+            <Text style={styles.actionText}>Attendance</Text>
+          </Pressable>
+          <Pressable style={styles.actionButton} onPress={() => setActiveSection('medical')}>
+            <View style={[styles.actionIcon, { backgroundColor: '#10b981' }]}>
+              <Heart size={20} color="#ffffff" />
+            </View>
+            <Text style={styles.actionText}>Medical</Text>
+          </Pressable>
+          <Pressable style={styles.actionButton} onPress={() => setActiveSection('notes')}>
+            <View style={[styles.actionIcon, { backgroundColor: '#f59e0b' }]}>
+              <BookOpen size={20} color="#ffffff" />
+            </View>
+            <Text style={styles.actionText}>Notes</Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -426,7 +533,10 @@ export default function ChildDetailsScreen() {
 
   const renderApplicationsSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Applications</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Applications</Text>
+        <Text style={styles.sectionSubtitle}>{applications.length} total applications</Text>
+      </View>
       {applications.length > 0 ? (
         applications.map((application) => (
           <Pressable 
@@ -457,7 +567,7 @@ export default function ChildDetailsScreen() {
         ))
       ) : (
         <View style={styles.emptyState}>
-          <FileText size={32} color="#d1d5db" />
+          <FileText size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>No applications found</Text>
         </View>
       )}
@@ -466,7 +576,10 @@ export default function ChildDetailsScreen() {
 
   const renderEnrollmentSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Current Enrollment</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Current Enrollment</Text>
+        <Text style={styles.sectionSubtitle}>{students.length} active enrollments</Text>
+      </View>
       {students.length > 0 ? (
         students.map((student) => (
           <View key={student.id} style={styles.studentCard}>
@@ -478,8 +591,16 @@ export default function ChildDetailsScreen() {
               <Text style={styles.crecheName}>{student.creches?.name}</Text>
               <Text style={styles.classText}>Class: {student.class || 'Not assigned'}</Text>
               <View style={styles.feesContainer}>
+                <View style={styles.feesProgress}>
+                  <View 
+                    style={[
+                      styles.feesProgressBar, 
+                      { width: `${(student.fees_paid / student.fees_owed) * 100}%` }
+                    ]} 
+                  />
+                </View>
                 <Text style={styles.feesText}>
-                  Fees: {formatCurrency(student.fees_paid)} paid / {formatCurrency(student.fees_owed)} owed
+                  {formatCurrency(student.fees_paid)} paid / {formatCurrency(student.fees_owed)} owed
                 </Text>
               </View>
             </View>
@@ -487,7 +608,7 @@ export default function ChildDetailsScreen() {
         ))
       ) : (
         <View style={styles.emptyState}>
-          <School size={32} color="#d1d5db" />
+          <School size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>Not currently enrolled</Text>
         </View>
       )}
@@ -496,7 +617,33 @@ export default function ChildDetailsScreen() {
 
   const renderAttendanceSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Recent Attendance</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Attendance</Text>
+        <Text style={styles.sectionSubtitle}>{getAttendancePercentage()}% overall attendance</Text>
+      </View>
+      
+      {/* Attendance Summary */}
+      <View style={styles.attendanceSummary}>
+        <View style={styles.attendanceStat}>
+          <Text style={styles.attendanceStatNumber}>
+            {attendance.filter(a => a.status === 'Present').length}
+          </Text>
+          <Text style={styles.attendanceStatLabel}>Present</Text>
+        </View>
+        <View style={styles.attendanceStat}>
+          <Text style={styles.attendanceStatNumber}>
+            {attendance.filter(a => a.status === 'Absent').length}
+          </Text>
+          <Text style={styles.attendanceStatLabel}>Absent</Text>
+        </View>
+        <View style={styles.attendanceStat}>
+          <Text style={styles.attendanceStatNumber}>
+            {attendance.filter(a => a.status === 'Late').length}
+          </Text>
+          <Text style={styles.attendanceStatLabel}>Late</Text>
+        </View>
+      </View>
+
       {attendance.length > 0 ? (
         attendance.map((record) => (
           <View key={record.id} style={styles.attendanceCard}>
@@ -532,7 +679,7 @@ export default function ChildDetailsScreen() {
         ))
       ) : (
         <View style={styles.emptyState}>
-          <CalendarClock size={32} color="#d1d5db" />
+          <CalendarClock size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>No attendance records</Text>
         </View>
       )}
@@ -541,7 +688,10 @@ export default function ChildDetailsScreen() {
 
   const renderMedicalSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Medical Records</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Medical Records</Text>
+        <Text style={styles.sectionSubtitle}>{medicalRecords.length} medical records</Text>
+      </View>
       {medicalRecords.length > 0 ? (
         medicalRecords.map((record) => (
           <View key={record.id} style={styles.medicalCard}>
@@ -549,34 +699,36 @@ export default function ChildDetailsScreen() {
               <Stethoscope size={20} color="#374151" />
               <Text style={styles.medicalCreche}>{record.creches?.name}</Text>
             </View>
-            <View style={styles.medicalInfo}>
-              <Text style={styles.medicalLabel}>Immunization Status:</Text>
-              <Text style={styles.medicalValue}>{record.immunization_status}</Text>
+            <View style={styles.medicalGrid}>
+              <View style={styles.medicalInfo}>
+                <Text style={styles.medicalLabel}>Immunization Status:</Text>
+                <Text style={styles.medicalValue}>{record.immunization_status}</Text>
+              </View>
+              {record.allergies && (
+                <View style={styles.medicalInfo}>
+                  <Text style={styles.medicalLabel}>Allergies:</Text>
+                  <Text style={styles.medicalValue}>{record.allergies}</Text>
+                </View>
+              )}
+              {record.last_checkup && (
+                <View style={styles.medicalInfo}>
+                  <Text style={styles.medicalLabel}>Last Checkup:</Text>
+                  <Text style={styles.medicalValue}>
+                    {new Date(record.last_checkup).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
+              {record.next_checkup && (
+                <View style={styles.medicalInfo}>
+                  <Text style={styles.medicalLabel}>Next Checkup:</Text>
+                  <Text style={styles.medicalValue}>
+                    {new Date(record.next_checkup).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
             </View>
-            {record.allergies && (
-              <View style={styles.medicalInfo}>
-                <Text style={styles.medicalLabel}>Allergies:</Text>
-                <Text style={styles.medicalValue}>{record.allergies}</Text>
-              </View>
-            )}
-            {record.last_checkup && (
-              <View style={styles.medicalInfo}>
-                <Text style={styles.medicalLabel}>Last Checkup:</Text>
-                <Text style={styles.medicalValue}>
-                  {new Date(record.last_checkup).toLocaleDateString()}
-                </Text>
-              </View>
-            )}
-            {record.next_checkup && (
-              <View style={styles.medicalInfo}>
-                <Text style={styles.medicalLabel}>Next Checkup:</Text>
-                <Text style={styles.medicalValue}>
-                  {new Date(record.next_checkup).toLocaleDateString()}
-                </Text>
-              </View>
-            )}
             {record.medical_notes && (
-              <View style={styles.medicalInfo}>
+              <View style={styles.medicalNotes}>
                 <Text style={styles.medicalLabel}>Notes:</Text>
                 <Text style={styles.medicalValue}>{record.medical_notes}</Text>
               </View>
@@ -585,7 +737,7 @@ export default function ChildDetailsScreen() {
         ))
       ) : (
         <View style={styles.emptyState}>
-          <Heart size={32} color="#d1d5db" />
+          <Heart size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>No medical records</Text>
         </View>
       )}
@@ -594,14 +746,24 @@ export default function ChildDetailsScreen() {
 
   const renderNotesSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Application Notes</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Application Notes</Text>
+        <Text style={styles.sectionSubtitle}>{applicationNotes.length} notes</Text>
+      </View>
       {applicationNotes.length > 0 ? (
         applicationNotes.map((note) => (
           <View key={note.id} style={styles.noteCard}>
             <View style={styles.noteHeader}>
-              <Text style={styles.noteAuthor}>
-                {note.users.first_name} {note.users.last_name}
-              </Text>
+              <View style={styles.noteAuthorInfo}>
+                <View style={styles.authorAvatar}>
+                  <Text style={styles.authorAvatarText}>
+                    {note.users.first_name.charAt(0)}{note.users.last_name.charAt(0)}
+                  </Text>
+                </View>
+                <Text style={styles.noteAuthor}>
+                  {note.users.first_name} {note.users.last_name}
+                </Text>
+              </View>
               <Text style={styles.noteDate}>
                 {new Date(note.created_at).toLocaleDateString()}
               </Text>
@@ -611,7 +773,7 @@ export default function ChildDetailsScreen() {
         ))
       ) : (
         <View style={styles.emptyState}>
-          <BookOpen size={32} color="#d1d5db" />
+          <BookOpen size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>No notes available</Text>
         </View>
       )}
@@ -623,10 +785,10 @@ export default function ChildDetailsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#374151" />
+          <ArrowLeft size={24} color="#ffffff" />
         </Pressable>
         <Text style={styles.headerTitle}>
-          {child.first_name} {child.last_name}
+          {child.first_name}'s Dashboard
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -635,7 +797,7 @@ export default function ChildDetailsScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsContainer}>
         <View style={styles.tabs}>
           {[
-            { key: 'overview', label: 'Overview', icon: TrendingUp },
+            { key: 'overview', label: 'Overview', icon: BarChart3 },
             { key: 'applications', label: 'Applications', icon: FileText },
             { key: 'enrollment', label: 'Enrollment', icon: School },
             { key: 'attendance', label: 'Attendance', icon: CalendarClock },
@@ -666,13 +828,16 @@ export default function ChildDetailsScreen() {
       </ScrollView>
 
       {/* Content */}
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {activeSection === 'overview' && renderOverviewSection()}
         {activeSection === 'applications' && renderApplicationsSection()}
         {activeSection === 'enrollment' && renderEnrollmentSection()}
         {activeSection === 'attendance' && renderAttendanceSection()}
         {activeSection === 'medical' && renderMedicalSection()}
         {activeSection === 'notes' && renderNotesSection()}
+        
+        {/* Extra padding at bottom */}
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
   );
@@ -680,7 +845,8 @@ export default function ChildDetailsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f4fcfe',
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
   header: {
     flexDirection: 'row',
@@ -689,20 +855,20 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#8b5cf6',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#ffffff',
   },
   placeholder: {
     width: 40,
@@ -710,7 +876,12 @@ const styles = StyleSheet.create({
   tabsContainer: {
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   tabs: {
     flexDirection: 'row',
@@ -725,21 +896,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f1f5f9',
   },
   activeTab: {
-    backgroundColor: '#bd84f6',
+    backgroundColor: '#8b5cf6',
   },
   tabText: {
     fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
+    color: '#64748b',
+    fontWeight: '600',
   },
   activeTabText: {
     color: '#ffffff',
   },
   content: {
-    padding: 20,
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -749,7 +920,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#64748b',
     marginTop: 12,
   },
   errorContainer: {
@@ -768,87 +939,244 @@ const styles = StyleSheet.create({
   },
   errorDescription: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#64748b',
     textAlign: 'center',
     lineHeight: 24,
   },
   section: {
-    marginBottom: 24,
+    padding: 20,
+  },
+  sectionHeader: {
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 16,
+    color: '#1e293b',
+    marginBottom: 4,
   },
-  infoCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardTitle: {
+  sectionSubtitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 12,
+    color: '#64748b',
   },
-  infoRow: {
+  // Hero Section
+  heroCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-    marginLeft: 8,
-    marginRight: 8,
-    minWidth: 120,
+  avatarContainer: {
+    marginRight: 16,
   },
-  infoValue: {
-    fontSize: 14,
-    color: '#6b7280',
+  heroAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#8b5cf6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAvatarText: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  heroInfo: {
     flex: 1,
   },
+  heroName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  heroAge: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  heroSince: {
+    fontSize: 14,
+    color: '#94a3b8',
+  },
+  heroStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 16,
+  },
+  heroStat: {
+    alignItems: 'center',
+  },
+  heroStatNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#8b5cf6',
+    marginBottom: 4,
+  },
+  heroStatLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    fontWeight: '600',
+  },
+  // Stats Grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginTop: 8,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    minWidth: (screenWidth - 52) / 2,
+    borderRadius: 16,
     padding: 16,
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#bd84f6',
+    color: '#ffffff',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+  },
+  // Progress Section
+  progressSection: {
+    marginBottom: 20,
+  },
+  progressCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  progressTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginLeft: 8,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  // Medical Summary
+  medicalSummary: {
+    marginBottom: 20,
+  },
+  medicalSummaryCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  medicalSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  medicalSummaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginLeft: 8,
+  },
+  medicalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  medicalText: {
+    fontSize: 14,
+    color: '#64748b',
+    marginLeft: 8,
+    flex: 1,
+  },
+  // Quick Actions
+  quickActions: {
+    marginBottom: 20,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  actionButton: {
+    alignItems: 'center',
+    width: (screenWidth - 64) / 2,
+  },
+  actionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
     textAlign: 'center',
   },
+  // Application Cards
   applicationCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -861,7 +1189,7 @@ const styles = StyleSheet.create({
   },
   studentCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -873,10 +1201,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   crecheImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    marginRight: 16,
   },
   applicationInfo: {
     flex: 1,
@@ -885,20 +1213,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   crecheName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#1e293b',
     marginBottom: 4,
   },
   applicationDate: {
     fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
+    color: '#64748b',
+    marginBottom: 8,
   },
   classText: {
     fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
+    color: '#64748b',
+    marginBottom: 8,
   },
   statusRow: {
     flexDirection: 'row',
@@ -911,16 +1239,57 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   feesContainer: {
-    marginTop: 4,
+    marginTop: 8,
+  },
+  feesProgress: {
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  feesProgressBar: {
+    height: '100%',
+    backgroundColor: '#10b981',
+    borderRadius: 2,
   },
   feesText: {
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
   },
+  // Attendance
+  attendanceSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  attendanceStat: {
+    alignItems: 'center',
+  },
+  attendanceStatNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#8b5cf6',
+    marginBottom: 4,
+  },
+  attendanceStatLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
   attendanceCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -938,38 +1307,41 @@ const styles = StyleSheet.create({
   },
   attendanceDay: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#64748b',
     textTransform: 'uppercase',
+    fontWeight: '600',
   },
   attendanceNumber: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#1e293b',
   },
   attendanceInfo: {
     flex: 1,
   },
   attendanceMonth: {
-    fontSize: 14,
-    color: '#374151',
+    fontSize: 16,
+    color: '#1e293b',
     marginBottom: 4,
+    fontWeight: '600',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 6,
+    marginRight: 8,
   },
   attendanceStatus: {
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'capitalize',
   },
+  // Medical Cards
   medicalCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -979,32 +1351,46 @@ const styles = StyleSheet.create({
   medicalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   medicalCreche: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#1e293b',
     marginLeft: 8,
   },
+  medicalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
   medicalInfo: {
-    marginBottom: 8,
+    flex: 1,
+    minWidth: '45%',
   },
   medicalLabel: {
     fontSize: 14,
-    color: '#374151',
+    color: '#64748b',
     fontWeight: '500',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   medicalValue: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 16,
+    color: '#1e293b',
+    fontWeight: '600',
   },
+  medicalNotes: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  // Notes
   noteCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1015,29 +1401,58 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  noteAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authorAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#8b5cf6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  authorAvatarText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   noteAuthor: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1e293b',
   },
   noteDate: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#64748b',
   },
   noteText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#475569',
     lineHeight: 20,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   emptyText: {
     fontSize: 16,
-    color: '#6b7280',
-    marginTop: 8,
+    color: '#64748b',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  bottomPadding: {
+    height: 40,
   },
 });
