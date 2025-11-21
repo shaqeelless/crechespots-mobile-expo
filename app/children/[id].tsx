@@ -909,9 +909,6 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#ffffff',
   },
-  content: {
-    flex: 1,
-  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
