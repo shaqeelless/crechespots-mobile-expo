@@ -265,7 +265,7 @@ export default function SearchScreen() {
       >
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: result.header_image || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }} 
+            source={{ uri: result.logo || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }} 
             style={styles.resultImage} 
             defaultSource={{ uri: 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }}
           />

@@ -66,7 +66,12 @@ export default function ArticleCard({ article, onLike, onComment, onShare }: Art
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return date.toLocaleDateString();
+    
+    // Show day and month only (no year)
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const authorName = article.creches?.name ||
