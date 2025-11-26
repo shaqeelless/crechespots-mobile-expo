@@ -1206,7 +1206,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   applicationInfo: {
-    flex: 1,
   },
   studentInfo: {
     flex: 1,

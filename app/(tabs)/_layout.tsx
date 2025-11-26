@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Bell, Baby, BookOpen, User } from 'lucide-react-native';
+import { Home, Bell, Baby, BookOpen, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import Animated, {
   useSharedValue,
