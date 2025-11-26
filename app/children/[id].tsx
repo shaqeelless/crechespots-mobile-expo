@@ -417,7 +417,7 @@ export default function ChildDetailsScreen() {
             <School size={20} color="#ffffff" />
           </View>
           <Text style={styles.statNumber}>{students.length}</Text>
-          <Text style={styles.statLabel}>Enrolled</Text>
+          <Text style={styles.statLabel}>Services</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#06b6d4' }]}>
           <View style={styles.statIconContainer}>
@@ -431,7 +431,7 @@ export default function ChildDetailsScreen() {
             <FileText size={20} color="#ffffff" />
           </View>
           <Text style={styles.statNumber}>{applications.length}</Text>
-          <Text style={styles.statLabel}>Applications</Text>
+          <Text style={styles.statLabel}>Reports</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#f59e0b' }]}>
           <View style={styles.statIconContainer}>
@@ -1206,6 +1206,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   applicationInfo: {
+      flex: 1,
   },
   studentInfo: {
     flex: 1,
