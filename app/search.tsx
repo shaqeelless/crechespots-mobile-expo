@@ -213,9 +213,6 @@ export default function SearchScreen() {
 
     // Apply active filter
     switch (activeFilter) {
-      case 'verified':
-        filtered = filtered.filter(creche => creche.registered === true);
-        break;
       case 'available':
         filtered = filtered.filter(creche => creche.applications === true);
         break;
@@ -450,14 +447,6 @@ export default function SearchScreen() {
           >
             <Text style={[styles.filterText, activeFilter === 'nearby' && styles.activeFilterText]}>
               Nearby
-            </Text>
-          </Pressable>
-          <Pressable 
-            style={[styles.filterChip, activeFilter === 'verified' && styles.activeFilter]}
-            onPress={() => setActiveFilter('verified')}
-          >
-            <Text style={[styles.filterText, activeFilter === 'verified' && styles.activeFilterText]}>
-              Verified
             </Text>
           </Pressable>
           <Pressable 
