@@ -12,10 +12,17 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Platform,
+  TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowRight, User, Mail, Phone, Camera, Check, Lock, ChevronDown, Eye, EyeOff, AlertCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for Expo OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -29,6 +36,8 @@ const preloadedImages = {
   onboarding5: require('@/assets/images/Onboardin-5.png'),
   onboarding6: require('@/assets/images/Onboardin-6.png'),
   splashScreen: require('@/assets/images/SplashScreen.png'),
+  googleIcon: require('@/assets/images/google-icon.png'),
+  facebookIcon: require('@/assets/images/facebook-icon.png'),
 };
 
 // Country codes data - South Africa first
@@ -95,6 +104,16 @@ const onboardingSteps = [
   },
   {
     id: 4,
+    title: 'Choose Your Sign Up Method',
+    subtitle: 'Get started quickly',
+    description: 'Sign up instantly with Google or Facebook, or continue with email registration.',
+    backgroundColor: '#f4fcfe',
+    color: '#3a5dc4',
+    isSocialLogin: true, // New step for social login choice
+    image: preloadedImages.onboarding5,
+  },
+  {
+    id: 5,
     title: 'Let\'s Get to Know You',
     subtitle: 'We\'re Happy You\'re Here',
     description: 'Tell us your name so we can set up your parent profile and help our creche community welcome you properly.',
@@ -105,7 +124,7 @@ const onboardingSteps = [
     image: preloadedImages.onboarding5,
   },
   {
-    id: 5,
+    id: 6,
     title: 'Stay Connected',
     subtitle: 'So Creches Can Reach Out',
     description: 'Share your email and phone number so creches can easily connect with you about openings and updates.',
@@ -116,7 +135,7 @@ const onboardingSteps = [
     image: preloadedImages.onboarding6,
   },
   {
-    id: 6,
+    id: 7,
     title: 'Almost There!',
     subtitle: 'Let\'s Keep Your Space Secure',
     description: 'Create a password to protect your account — your info is safe with your new Crechespots family.',
@@ -216,6 +235,8 @@ export default function OnboardingScreen() {
   const [formErrors, setFormErrors] = useState({});
   const [passwordStrength, setPasswordStrength] = useState({ strength: 0, feedback: [] });
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const imageScale = useRef(new Animated.Value(1)).current;
   const imageOpacity = useRef(new Animated.Value(1)).current;
@@ -251,6 +272,173 @@ export default function OnboardingScreen() {
 
     preloadImages();
   }, []);
+
+  // Social login functions
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      // Generate redirect URL based on platform
+      let redirectUrl;
+      
+      if (Platform.OS === 'web') {
+        redirectUrl = 'https://crechespots.com/auth/callback';
+      } else {
+        redirectUrl = 'crechespots://auth/callback';
+      }
+
+      console.log('Google OAuth - Redirect URL:', redirectUrl);
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      if (error) throw error;
+
+      // For mobile, open the OAuth URL
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('Opening WebBrowser for Google OAuth');
+        
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl,
+          {
+            showTitle: false,
+            enableBarCollapsing: true,
+            createTask: false,
+            preferEphemeralSession: false,
+          }
+        );
+
+        console.log('OAuth Result Type:', result.type);
+
+        if (result.type === 'success' && result.url) {
+          console.log('OAuth successful, result URL:', result.url);
+          
+          const { queryParams } = Linking.parse(result.url);
+          console.log('Query params from OAuth:', queryParams);
+          
+          if (queryParams?.error) {
+            throw new Error(queryParams.error_description || queryParams.error || 'Authentication failed');
+          }
+          
+          if (queryParams?.access_token) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: queryParams.access_token as string,
+              refresh_token: queryParams.refresh_token as string,
+            });
+            
+            if (sessionError) throw sessionError;
+            
+            console.log('Google OAuth successful, redirecting to home');
+            router.replace('/(app)/(tabs)/home');
+          } else {
+            console.log('No direct tokens, navigating to callback screen');
+            router.push('/auth/callback');
+          }
+        } else if (result.type === 'cancel') {
+          throw new Error('Authentication cancelled by user');
+        } else {
+          console.log('WebBrowser result:', result);
+          throw new Error('Authentication failed or browser closed');
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      Alert.alert('Google Sign In Failed', error.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    setFacebookLoading(true);
+    
+    try {
+      // Generate redirect URL based on platform
+      let redirectUrl;
+      
+      if (Platform.OS === 'web') {
+        redirectUrl = 'https://crechespots.com/auth/callback';
+      } else {
+        redirectUrl = 'crechespots://auth/callback';
+      }
+
+      console.log('Facebook OAuth - Redirect URL:', redirectUrl);
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      if (error) throw error;
+
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('Opening WebBrowser for Facebook OAuth');
+        
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl,
+          {
+            showTitle: false,
+            enableBarCollapsing: true,
+            createTask: false,
+            preferEphemeralSession: false,
+          }
+        );
+
+        console.log('Facebook OAuth Result Type:', result.type);
+
+        if (result.type === 'success' && result.url) {
+          console.log('Facebook OAuth successful, result URL:', result.url);
+          
+          const { queryParams } = Linking.parse(result.url);
+          console.log('Query params from Facebook OAuth:', queryParams);
+          
+          if (queryParams?.error) {
+            throw new Error(queryParams.error_description || queryParams.error || 'Authentication failed');
+          }
+          
+          if (queryParams?.access_token) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: queryParams.access_token as string,
+              refresh_token: queryParams.refresh_token as string,
+            });
+            
+            if (sessionError) throw sessionError;
+            
+            console.log('Facebook OAuth successful, redirecting to home');
+            router.replace('/(app)/(tabs)/home');
+          } else {
+            console.log('No direct tokens, navigating to callback screen');
+            router.push('/auth/callback');
+          }
+        } else if (result.type === 'cancel') {
+          throw new Error('Authentication cancelled by user');
+        } else {
+          console.log('Facebook WebBrowser result:', result);
+          throw new Error('Authentication failed or browser closed');
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('Facebook sign-in error:', error);
+      Alert.alert('Facebook Sign In Failed', error.message || 'Facebook sign-in failed. Please try again.');
+    } finally {
+      setFacebookLoading(false);
+    }
+  };
 
   // Validation functions
   const validateName = () => {
@@ -320,6 +508,13 @@ export default function OnboardingScreen() {
     console.log(`🔄 handleNext called for step ${currentIndex + 1}`);
     const currentStep = onboardingSteps[currentIndex];
     
+    // Skip validation for social login step
+    if (currentStep.isSocialLogin) {
+      // Move to next step (name form)
+      navigateToNextStep();
+      return;
+    }
+    
     // Validate form steps
     if (currentStep.isForm) {
       let errors = {};
@@ -354,50 +549,59 @@ export default function OnboardingScreen() {
 
     // For all other steps, proceed to next step
     if (currentIndex < onboardingSteps.length - 1) {
-      // Smooth image transition
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(imageOpacity, {
-            toValue: 0,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.timing(imageScale, {
-            toValue: 0.9,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(imageOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(imageScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
-
-      // Content fade animation
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      setCurrentIndex(currentIndex + 1);
+      navigateToNextStep();
     }
+  };
+
+  const navigateToNextStep = () => {
+    // Smooth image transition
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(imageOpacity, {
+          toValue: 0,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(imageScale, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(imageOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(imageScale, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Content fade animation
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setCurrentIndex(currentIndex + 1);
+  };
+
+  const handleContinueWithEmail = () => {
+    // Skip to the name form step
+    setCurrentIndex(4); // Skip to step 5 (name form)
   };
 
   const createAccount = async () => {
@@ -724,6 +928,65 @@ export default function OnboardingScreen() {
     );
   };
 
+  const renderSocialLoginButtons = () => {
+    return (
+      <View style={styles.socialLoginContainer}>
+        <View style={styles.socialButtonsRow}>
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: '#FFFFFF' }]}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading || loading}
+          >
+            <Image
+              source={preloadedImages.googleIcon}
+              style={styles.socialIcon}
+              resizeMode="contain"
+            />
+            {googleLoading && (
+              <View style={styles.socialButtonLoading}>
+                <Text style={styles.socialButtonLoadingText}>...</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: '#1877F2' }]}
+            onPress={handleFacebookSignIn}
+            disabled={facebookLoading || loading}
+          >
+            <Image
+              source={preloadedImages.facebookIcon}
+              style={[styles.socialIcon, styles.facebookIcon]}
+              resizeMode="contain"
+            />
+            {facebookLoading && (
+              <View style={styles.socialButtonLoading}>
+                <Text style={styles.socialButtonLoadingText}>...</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.divider} />
+        </View>
+        
+        <Pressable 
+          style={[styles.emailButton, loading && styles.disabledButton]} 
+          onPress={handleContinueWithEmail}
+          disabled={loading}
+        >
+          <Text style={styles.emailButtonText}>
+            Continue with Email
+          </Text>
+          <ArrowRight size={20} color="#3a5dc4" />
+        </Pressable>
+      </View>
+    );
+  };
+
   const renderFormContent = (step) => {
     switch (step.formType) {
       case 'name':
@@ -897,6 +1160,14 @@ export default function OnboardingScreen() {
     }
   };
 
+  const renderSocialLoginStep = () => {
+    return (
+      <View style={styles.socialStepContainer}>
+        {renderSocialLoginButtons()}
+      </View>
+    );
+  };
+
   const currentStep = onboardingSteps[currentIndex];
 
   return (
@@ -961,26 +1232,29 @@ export default function OnboardingScreen() {
             {currentStep.description}
           </Text>
 
+          {currentStep.isSocialLogin && renderSocialLoginStep()}
           {currentStep.isForm && renderFormContent(currentStep)}
         </ScrollView>
       </Animated.View>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        {renderDots()}
-        
-        <Pressable 
-          style={[styles.nextButton, loading && styles.disabledButton]} 
-          onPress={handleNext}
-          disabled={loading}
-        >
-          <Text style={styles.nextButtonText}>
-            {loading ? 'Creating Account...' : 
-             currentStep.formType === 'password' ? 'Create Account' : 'Next'}
-          </Text>
-          {!loading && <ArrowRight size={20} color="#ffffff" />}
-        </Pressable>
-      </View>
+      {/* Footer - Hide dots and next button on social login step */}
+      {!currentStep.isSocialLogin && (
+        <View style={styles.footer}>
+          {renderDots()}
+          
+          <Pressable 
+            style={[styles.nextButton, loading && styles.disabledButton]} 
+            onPress={handleNext}
+            disabled={loading}
+          >
+            <Text style={styles.nextButtonText}>
+              {loading ? 'Creating Account...' : 
+               currentStep.formType === 'password' ? 'Create Account' : 'Next'}
+            </Text>
+            {!loading && <ArrowRight size={20} color="#ffffff" />}
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -1071,6 +1345,10 @@ const styles = StyleSheet.create({
     lineHeight: isSmallScreen ? 20 : 24,
     opacity: 0.9,
     marginBottom: isSmallScreen ? 24 : 32,
+  },
+  socialStepContainer: {
+    width: '100%',
+    marginTop: isSmallScreen ? 10 : 20,
   },
   formContainer: {
     width: '100%',
@@ -1261,6 +1539,87 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  // Social login styles
+  socialLoginContainer: {
+    marginTop: isSmallScreen ? 10 : 20,
+    alignItems: 'center',
+  },
+  socialButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: isSmallScreen ? 20 : 30,
+    marginBottom: isSmallScreen ? 20 : 30,
+  },
+  socialButton: {
+    width: isSmallScreen ? 60 : 70,
+    height: isSmallScreen ? 60 : 70,
+    borderRadius: isSmallScreen ? 30 : 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  socialIcon: {
+    width: isSmallScreen ? 28 : 32,
+    height: isSmallScreen ? 28 : 32,
+  },
+  facebookIcon: {
+    tintColor: 'white',
+  },
+  socialButtonLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: isSmallScreen ? 30 : 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialButtonLoadingText: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: 'bold',
+    color: '#3a5dc4',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: isSmallScreen ? 20 : 24,
+    width: '100%',
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(58, 93, 196, 0.3)',
+  },
+  dividerText: {
+    color: '#3a5dc4',
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '500',
+    marginHorizontal: isSmallScreen ? 12 : 16,
+  },
+  emailButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: isSmallScreen ? 14 : 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#3a5dc4',
+    gap: 8,
+    width: '100%',
+  },
+  emailButtonText: {
+    color: '#3a5dc4',
+    fontSize: isSmallScreen ? 15 : 16,
+    fontWeight: '600',
   },
   footer: {
     paddingHorizontal: 24,
