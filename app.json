@@ -4,7 +4,7 @@
     "slug": "crechespots",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "crechespots",
     "platforms": ["ios", "android", "web"],
     "userInterfaceStyle": "automatic",
@@ -34,7 +34,7 @@
       "package": "com.softglitch.crechespots",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/app-icon.png",
         "backgroundColor": "#000000"
       },
       "intentFilters": [
@@ -56,7 +56,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/app-icon.png",
       "bundler": "metro",
       "output": "single"
     },
