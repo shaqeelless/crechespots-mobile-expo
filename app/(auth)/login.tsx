@@ -9,10 +9,17 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for Expo OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -20,6 +27,8 @@ const isSmallScreen = height < 700;
 // Preload images
 const preloadedImages = {
   splashScreen: require('@/assets/images/SplashScreen.png'),
+  googleIcon: require('@/assets/images/google-icon.png'),
+  facebookIcon: require('@/assets/images/facebook-icon.png'),
 };
 
 export default function LoginScreen() {
@@ -30,6 +39,8 @@ export default function LoginScreen() {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [imagesLoaded, setImagesLoaded] = useState(false);
@@ -41,6 +52,8 @@ export default function LoginScreen() {
       try {
         const imageUris = [
           Image.prefetch(Image.resolveAssetSource(preloadedImages.splashScreen).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.googleIcon).uri),
+          Image.prefetch(Image.resolveAssetSource(preloadedImages.facebookIcon).uri),
         ];
         
         await Promise.all(imageUris);
@@ -53,6 +66,173 @@ export default function LoginScreen() {
 
     preloadImages();
   }, []);
+
+  // Social login functions
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      // Generate redirect URL based on platform
+      let redirectUrl;
+      
+      if (Platform.OS === 'web') {
+        redirectUrl = 'https://crechespots.com/auth/callback';
+      } else {
+        redirectUrl = 'crechespots://auth/callback';
+      }
+
+      console.log('Google OAuth - Redirect URL:', redirectUrl);
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      if (error) throw error;
+
+      // For mobile, open the OAuth URL
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('Opening WebBrowser for Google OAuth');
+        
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl,
+          {
+            showTitle: false,
+            enableBarCollapsing: true,
+            createTask: false,
+            preferEphemeralSession: false,
+          }
+        );
+
+        console.log('OAuth Result Type:', result.type);
+
+        if (result.type === 'success' && result.url) {
+          console.log('OAuth successful, result URL:', result.url);
+          
+          const { queryParams } = require('expo-linking').parse(result.url);
+          console.log('Query params from OAuth:', queryParams);
+          
+          if (queryParams?.error) {
+            throw new Error(queryParams.error_description || queryParams.error || 'Authentication failed');
+          }
+          
+          if (queryParams?.access_token) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: queryParams.access_token as string,
+              refresh_token: queryParams.refresh_token as string,
+            });
+            
+            if (sessionError) throw sessionError;
+            
+            console.log('Google OAuth successful, redirecting to home');
+            router.replace('/(app)/(tabs)/home');
+          } else {
+            console.log('No direct tokens, navigating to callback screen');
+            router.push('/auth/callback');
+          }
+        } else if (result.type === 'cancel') {
+          throw new Error('Authentication cancelled by user');
+        } else {
+          console.log('WebBrowser result:', result);
+          throw new Error('Authentication failed or browser closed');
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      Alert.alert('Google Sign In Failed', error.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    setFacebookLoading(true);
+    
+    try {
+      // Generate redirect URL based on platform
+      let redirectUrl;
+      
+      if (Platform.OS === 'web') {
+        redirectUrl = 'https://crechespots.com/auth/callback';
+      } else {
+        redirectUrl = 'crechespots://auth/callback';
+      }
+
+      console.log('Facebook OAuth - Redirect URL:', redirectUrl);
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      if (error) throw error;
+
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('Opening WebBrowser for Facebook OAuth');
+        
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl,
+          {
+            showTitle: false,
+            enableBarCollapsing: true,
+            createTask: false,
+            preferEphemeralSession: false,
+          }
+        );
+
+        console.log('Facebook OAuth Result Type:', result.type);
+
+        if (result.type === 'success' && result.url) {
+          console.log('Facebook OAuth successful, result URL:', result.url);
+          
+          const { queryParams } = require('expo-linking').parse(result.url);
+          console.log('Query params from Facebook OAuth:', queryParams);
+          
+          if (queryParams?.error) {
+            throw new Error(queryParams.error_description || queryParams.error || 'Authentication failed');
+          }
+          
+          if (queryParams?.access_token) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: queryParams.access_token as string,
+              refresh_token: queryParams.refresh_token as string,
+            });
+            
+            if (sessionError) throw sessionError;
+            
+            console.log('Facebook OAuth successful, redirecting to home');
+            router.replace('/(app)/(tabs)/home');
+          } else {
+            console.log('No direct tokens, navigating to callback screen');
+            router.push('/auth/callback');
+          }
+        } else if (result.type === 'cancel') {
+          throw new Error('Authentication cancelled by user');
+        } else {
+          console.log('Facebook WebBrowser result:', result);
+          throw new Error('Authentication failed or browser closed');
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('Facebook sign-in error:', error);
+      Alert.alert('Facebook Sign In Failed', error.message || 'Facebook sign-in failed. Please try again.');
+    } finally {
+      setFacebookLoading(false);
+    }
+  };
 
   // Validation functions
   const validateForm = () => {
@@ -216,6 +396,54 @@ export default function LoginScreen() {
     });
   };
 
+  const renderSocialLoginButtons = () => {
+    return (
+      <View style={styles.socialLoginContainer}>
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>or continue with</Text>
+          <View style={styles.divider} />
+        </View>
+        
+        <View style={styles.socialButtonsRow}>
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: '#FFFFFF' }]}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading || loading}
+          >
+            <Image
+              source={preloadedImages.googleIcon}
+              style={styles.socialIcon}
+              resizeMode="contain"
+            />
+            {googleLoading && (
+              <View style={styles.socialButtonLoading}>
+                <Text style={styles.socialButtonLoadingText}>...</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: '#1877F2' }]}
+            onPress={handleFacebookSignIn}
+            disabled={facebookLoading || loading}
+          >
+            <Image
+              source={preloadedImages.facebookIcon}
+              style={[styles.socialIcon, styles.facebookIcon]}
+              resizeMode="contain"
+            />
+            {facebookLoading && (
+              <View style={styles.socialButtonLoading}>
+                <Text style={styles.socialButtonLoadingText}>...</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -248,6 +476,8 @@ export default function LoginScreen() {
               </Text>
             </View>
           )}
+
+
 
           {/* Form */}
           <View style={styles.form}>
@@ -300,6 +530,9 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
           </View>
+
+                    {/* Social Login */}
+          {renderSocialLoginButtons()}
 
           {/* Login Button */}
           <Pressable 
@@ -394,6 +627,67 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 12 : 13,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  // Social login styles
+  socialLoginContainer: {
+    marginBottom: isSmallScreen ? 24 : 32,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: isSmallScreen ? 20 : 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(58, 93, 196, 0.3)',
+  },
+  dividerText: {
+    color: '#3a5dc4',
+    fontSize: isSmallScreen ? 14 : 15,
+    fontWeight: '500',
+    marginHorizontal: isSmallScreen ? 12 : 16,
+    opacity: 0.8,
+  },
+  socialButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: isSmallScreen ? 20 : 30,
+  },
+  socialButton: {
+    width: isSmallScreen ? 55 : 65,
+    height: isSmallScreen ? 55 : 65,
+    borderRadius: isSmallScreen ? 27.5 : 32.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  socialIcon: {
+    width: isSmallScreen ? 24 : 28,
+    height: isSmallScreen ? 24 : 28,
+  },
+  facebookIcon: {
+    tintColor: 'white',
+  },
+  socialButtonLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: isSmallScreen ? 27.5 : 32.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialButtonLoadingText: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: 'bold',
+    color: '#3a5dc4',
   },
   form: {
     marginBottom: isSmallScreen ? 24 : 32,

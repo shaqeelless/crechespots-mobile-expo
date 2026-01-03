@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,7 +12,7 @@ import Animated, {
 const { width } = Dimensions.get('window');
 
 // Use TouchableOpacity instead of View for the animated component
-const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
 interface AnimatedActionButtonProps {
@@ -98,7 +98,6 @@ const AnimatedActionButton: React.FC<AnimatedActionButtonProps> = ({
       <AnimatedPressable 
         style={[styles.actionButton, { backgroundColor }, animatedStyle]}
         onPress={handlePress}
-        activeOpacity={0.7} // Add feedback when pressed
       >
         <Icon size={24} color="#ffffff" />
       </AnimatedPressable>

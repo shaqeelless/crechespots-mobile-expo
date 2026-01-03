@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
+
 import { MapPin, Star } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -14,7 +15,7 @@ import Animated, {
   ZoomIn,
 } from 'react-native-reanimated';
 
-const AnimatedPressable = Animated.createAnimatedComponent(View);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedView = Animated.createAnimatedComponent(View);
 const AnimatedText = Animated.createAnimatedComponent(Text);
 const AnimatedImage = Animated.createAnimatedComponent(Image);
