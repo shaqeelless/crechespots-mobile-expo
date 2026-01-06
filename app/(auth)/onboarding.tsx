@@ -1568,7 +1568,6 @@ const styles = StyleSheet.create({
     height: isSmallScreen ? 28 : 32,
   },
   facebookIcon: {
-    tintColor: 'white',
   },
   socialButtonLoading: {
     position: 'absolute',

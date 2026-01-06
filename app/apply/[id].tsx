@@ -11,7 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, User, Phone, Mail, MessageCircle, Baby, MapPin } from 'lucide-react-native';
+import { ArrowLeft, User, Phone, Mail, MessageCircle, Baby, MapPin, AlertCircle } from 'lucide-react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -41,6 +41,12 @@ interface Creche {
   name: string;
   header_image: string;
   address: string;
+}
+
+interface ExistingApplication {
+  child_id: string;
+  application_status: string;
+  submitted_at: string;
 }
 
 // Animated Components
@@ -159,16 +165,18 @@ const AnimatedSkeleton = () => {
   );
 };
 
-// Custom child component with built-in animation
+// Custom child component with built-in animation and duplicate check
 const AnimatedChildOption = ({ 
   child, 
   index, 
   isSelected, 
+  existingApplication,
   onPress 
 }: { 
   child: Child;
   index: number;
   isSelected: boolean;
+  existingApplication: ExistingApplication | null;
   onPress: () => void;
 }) => {
   const getInitials = (firstName: string, lastName: string) => {
@@ -188,13 +196,35 @@ const AnimatedChildOption = ({
     return age;
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'approved': return '#10b981';
+      case 'declined': return '#ef4444';
+      case 'pending': return '#f59e0b';
+      default: return '#6b7280';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const hasExistingApplication = !!existingApplication;
+
   return (
     <AnimatedPressable
       style={[
         styles.childOption,
         isSelected && styles.selectedChildOption,
+        hasExistingApplication && styles.disabledChildOption,
       ]}
       onPress={onPress}
+      disabled={hasExistingApplication}
       entering={FadeInUp.delay(600 + index * 100).duration(400).springify()}
     >
       <View style={styles.childAvatar}>
@@ -203,17 +233,50 @@ const AnimatedChildOption = ({
         </Text>
       </View>
       <View style={styles.childDetails}>
-        <Text style={styles.childName}>
+        <Text style={[
+          styles.childName,
+          hasExistingApplication && styles.disabledText
+        ]}>
           {child.first_name} {child.last_name}
         </Text>
-        <Text style={styles.childAge}>
+        <Text style={[
+          styles.childAge,
+          hasExistingApplication && styles.disabledText
+        ]}>
           {calculateAge(child.date_of_birth)} years old • {child.gender}
         </Text>
+        {hasExistingApplication && (
+          <View style={styles.existingApplicationInfo}>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: `${getStatusColor(existingApplication.application_status)}15` }
+            ]}>
+              <View style={[
+                styles.statusDot,
+                { backgroundColor: getStatusColor(existingApplication.application_status) }
+              ]} />
+              <Text style={[
+                styles.statusText,
+                { color: getStatusColor(existingApplication.application_status) }
+              ]}>
+                {existingApplication.application_status}
+              </Text>
+            </View>
+            <Text style={styles.applicationDate}>
+              Applied on {formatDate(existingApplication.submitted_at)}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={[
         styles.radioButton,
         isSelected && styles.selectedRadioButton,
-      ]} />
+        hasExistingApplication && styles.disabledRadioButton,
+      ]}>
+        {hasExistingApplication && (
+          <AlertCircle size={12} color="#ffffff" />
+        )}
+      </View>
     </AnimatedPressable>
   );
 };
@@ -226,12 +289,13 @@ export default function ApplyScreen() {
   const [selectedChild, setSelectedChild] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [existingApplications, setExistingApplications] = useState<Record<string, ExistingApplication>>({});
   
   const [formData, setFormData] = useState({
     message: '',
   });
 
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   useEffect(() => {
     fetchData();
@@ -260,9 +324,38 @@ export default function ApplyScreen() {
       if (childrenError) throw childrenError;
       setChildren(childrenData || []);
 
-      // Pre-select first child if available
-      if (childrenData && childrenData.length > 0) {
-        setSelectedChild(childrenData[0].id);
+      // Check for existing applications
+      if (childrenData && childrenData.length > 0 && user) {
+        const childIds = childrenData.map(child => child.id);
+        
+        const { data: applicationsData, error: applicationsError } = await supabase
+          .from('applications')
+          .select('child_id, application_status, submitted_at')
+          .eq('creche_id', id)
+          .eq('user_id', user.id)
+          .in('child_id', childIds);
+
+        if (applicationsError) throw applicationsError;
+
+        // Create a mapping of child_id to existing application
+        const existingApps: Record<string, ExistingApplication> = {};
+        applicationsData?.forEach(app => {
+          existingApps[app.child_id] = {
+            child_id: app.child_id,
+            application_status: app.application_status,
+            submitted_at: app.submitted_at
+          };
+        });
+        setExistingApplications(existingApps);
+
+        // Pre-select first available child (not already applied)
+        const firstAvailableChild = childrenData.find(child => !existingApps[child.id]);
+        if (firstAvailableChild) {
+          setSelectedChild(firstAvailableChild.id);
+        } else if (childrenData.length > 0) {
+          // If all children already applied, select none
+          setSelectedChild('');
+        }
       }
 
     } catch (error) {
@@ -273,13 +366,48 @@ export default function ApplyScreen() {
     }
   };
 
+  const checkDuplicateApplication = async (childId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('creche_id', id)
+        .eq('child_id', childId)
+        .eq('user_id', user?.id)
+        .single();
+
+      // If we get data, it means an application already exists
+      return !!data;
+    } catch (error) {
+      // If no record found, it will throw an error
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedChild) {
       Alert.alert('Error', 'Please select a child for this application');
       return;
     }
 
-    if (!profile) {
+    // Check if child already has an application
+    if (existingApplications[selectedChild]) {
+      const existingApp = existingApplications[selectedChild];
+      Alert.alert(
+        'Already Applied',
+        `You already have a ${existingApp.application_status} application for this child at ${creche?.name}.`,
+        [
+          {
+            text: 'View Applications',
+            onPress: () => router.push('/applications'),
+          },
+          { text: 'OK' },
+        ]
+      );
+      return;
+    }
+
+    if (!profile || !user) {
       Alert.alert('Error', 'Please complete your profile before applying');
       return;
     }
@@ -290,6 +418,7 @@ export default function ApplyScreen() {
       const applicationData = {
         creche_id: id,
         child_id: selectedChild,
+        user_id: user.id, // Important: Include user_id for the unique constraint
         parent_name: `${profile.first_name} ${profile.last_name}`,
         parent_phone_number: profile.phone_number || '',
         parent_email: profile.email,
@@ -303,7 +432,38 @@ export default function ApplyScreen() {
         .from('applications')
         .insert([applicationData]);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a duplicate key violation
+        if (error.code === '23505') { // PostgreSQL unique violation code
+          Alert.alert(
+            'Duplicate Application',
+            'This child already has an application for this creche. Please check your applications.',
+            [
+              {
+                text: 'View Applications',
+                onPress: () => router.push('/applications'),
+              },
+              { 
+                text: 'Refresh',
+                onPress: () => fetchData()
+              },
+            ]
+          );
+          return;
+        }
+        throw error;
+      }
+
+      // Add the new application to the existing applications mapping
+      const newExistingApp: ExistingApplication = {
+        child_id: selectedChild,
+        application_status: 'New',
+        submitted_at: new Date().toISOString()
+      };
+      setExistingApplications(prev => ({
+        ...prev,
+        [selectedChild]: newExistingApp
+      }));
 
       Alert.alert(
         'Application Submitted!',
@@ -320,9 +480,34 @@ export default function ApplyScreen() {
         ]
       );
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting application:', error);
-      Alert.alert('Error', 'Failed to submit application. Please try again.');
+      
+      // Handle different error cases
+      if (error.code === '23505') {
+        Alert.alert(
+          'Duplicate Application',
+          'This child already has an application for this creche.',
+          [
+            {
+              text: 'View Applications',
+              onPress: () => router.push('/applications'),
+            },
+            { 
+              text: 'Refresh',
+              onPress: () => fetchData()
+            },
+          ]
+        );
+      } else if (error.message?.includes('unique constraint')) {
+        Alert.alert(
+          'Already Applied',
+          'You have already submitted an application for this child at this creche.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to submit application. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -342,6 +527,8 @@ export default function ApplyScreen() {
       </View>
     );
   }
+
+  const getSelectedChildExistingApp = selectedChild ? existingApplications[selectedChild] : null;
 
   return (
     <View style={styles.container}>
@@ -396,7 +583,13 @@ export default function ApplyScreen() {
                   child={child}
                   index={index}
                   isSelected={selectedChild === child.id}
-                  onPress={() => setSelectedChild(child.id)}
+                  existingApplication={existingApplications[child.id] || null}
+                  onPress={() => {
+                    const hasExistingApp = !!existingApplications[child.id];
+                    if (!hasExistingApp) {
+                      setSelectedChild(child.id);
+                    }
+                  }}
                 />
               ))}
             </View>
@@ -415,12 +608,27 @@ export default function ApplyScreen() {
               </Pressable>
             </AnimatedView>
           )}
+          
+          {/* Warning if all children already applied */}
+          {children.length > 0 && 
+           Object.keys(existingApplications).length === children.length && (
+            <AnimatedView 
+              style={styles.warningContainer}
+              entering={FadeInUp.delay(700).duration(600).springify()}
+            >
+              <AlertCircle size={20} color="#f59e0b" />
+              <Text style={styles.warningText}>
+                All your children already have applications for this creche.
+                You can check the status in your Applications section.
+              </Text>
+            </AnimatedView>
+          )}
         </AnimatedView>
 
         {/* Parent Information */}
         <AnimatedView 
           style={styles.section}
-          entering={FadeInUp.delay(700).duration(600).springify()}
+          entering={FadeInUp.delay(800).duration(600).springify()}
         >
           <Text style={styles.sectionTitle}>Parent Information (From Your Profile)</Text>
           
@@ -469,7 +677,7 @@ export default function ApplyScreen() {
         {/* Message */}
         <AnimatedView 
           style={styles.section}
-          entering={FadeInUp.delay(800).duration(600).springify()}
+          entering={FadeInUp.delay(900).duration(600).springify()}
         >
           <Text style={styles.sectionTitle}>Message to Creche</Text>
           <View style={styles.messageContainer}>
@@ -489,21 +697,30 @@ export default function ApplyScreen() {
         {/* Submit Button */}
         <AnimatedView 
           style={styles.submitSection}
-          entering={FadeInUp.delay(900).duration(600).springify()}
+          entering={FadeInUp.delay(1000).duration(600).springify()}
         >
           <Pressable 
-            style={[styles.submitButton, submitting && styles.disabledButton]}
+            style={[
+              styles.submitButton, 
+              (submitting || getSelectedChildExistingApp) && styles.disabledButton
+            ]}
             onPress={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !!getSelectedChildExistingApp}
           >
             <Text style={styles.submitButtonText}>
-              {submitting ? 'Submitting...' : 'Submit Application'}
+              {getSelectedChildExistingApp 
+                ? `Already Applied (${getSelectedChildExistingApp.application_status})` 
+                : submitting 
+                  ? 'Submitting...' 
+                  : 'Submit Application'
+              }
             </Text>
           </Pressable>
           
           <Text style={styles.disclaimer}>
             By submitting this application, you agree to share your contact information 
-            with the creche for communication purposes.
+            with the creche for communication purposes. Each child can only have one active 
+            application per creche.
           </Text>
         </AnimatedView>
       </AnimatedScrollView>
@@ -602,6 +819,10 @@ const styles = StyleSheet.create({
     borderColor: '#bd84f6',
     backgroundColor: '#fdf2f8',
   },
+  disabledChildOption: {
+    opacity: 0.7,
+    backgroundColor: '#f3f4f6',
+  },
   childAvatar: {
     width: 40,
     height: 40,
@@ -628,17 +849,54 @@ const styles = StyleSheet.create({
   childAge: {
     fontSize: 14,
     color: '#6b7280',
+    marginBottom: 4,
+  },
+  disabledText: {
+    color: '#6b7280',
+  },
+  existingApplicationInfo: {
+    marginTop: 4,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  applicationDate: {
+    fontSize: 12,
+    color: '#9ca3af',
   },
   radioButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#d1d5db',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   selectedRadioButton: {
     borderColor: '#bd84f6',
     backgroundColor: '#bd84f6',
+  },
+  disabledRadioButton: {
+    borderColor: '#9ca3af',
+    backgroundColor: '#9ca3af',
   },
   noChildrenContainer: {
     alignItems: 'center',
@@ -660,6 +918,22 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#fffbeb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400e',
+    marginLeft: 8,
   },
   messageContainer: {
     flexDirection: 'row',
@@ -727,7 +1001,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   disabledButton: {
-    opacity: 0.6,
+    backgroundColor: '#9ca3af',
+    opacity: 0.7,
   },
   submitButtonText: {
     color: '#ffffff',

@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Plus, Edit3, Calendar, User, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Plus, Edit3, Calendar, User, Trash2, LinkIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -224,13 +224,13 @@ const SwipeableChildCard = ({
               Born {new Date(child.date_of_birth).toLocaleDateString()}
             </Text>
           </View>
-          
-          <Pressable 
+
+                    <View 
             style={styles.editButton}
-            onPress={handleEditPress}
           >
             <Edit3 size={18} color="#bd84f6" />
-          </Pressable>
+          </View>
+          
         </Pressable>
       </Animated.View>
     </View>
@@ -348,12 +348,11 @@ const EnhancedChildCard = ({
             </Text>
           </View>
           
-          <Pressable 
+          <View 
             style={styles.editButton}
-            onPress={onEdit}
           >
             <Edit3 size={18} color="#bd84f6" />
-          </Pressable>
+          </View>
         </Pressable>
       </View>
     </View>
@@ -457,15 +456,24 @@ export default function ChildrenScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>My Children</Text>
-        <Pressable 
-          style={styles.addButton}
-          onPress={() => router.push('/children/add')}
-        >
-          <Plus size={24} color="#bd84f6" />
-        </Pressable>
-      </View>
+
+<View style={styles.header}>
+  <Text style={styles.title}>My Children</Text>
+  <View style={styles.headerActions}>
+    <Pressable 
+      style={styles.headerButton}
+      onPress={() => router.push('/join-child')}
+    >
+      <LinkIcon size={20} color="#8b5cf6" />
+    </Pressable>
+    <Pressable 
+      style={styles.headerButton}
+      onPress={() => router.push('/children/add')}
+    >
+      <Plus size={20} color="#8b5cf6" />
+    </Pressable>
+  </View>
+</View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {loading ? (
@@ -750,6 +758,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+
+   headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8, // This controls the space between buttons
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
   // Loading Overlay
