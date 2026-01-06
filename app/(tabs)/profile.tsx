@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -23,8 +24,11 @@ import {
   Phone,
   Mail,
   LogOut,
+  Camera,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '@/lib/supabase';
 
 // Skeleton loader
 const ProfileSkeleton = () => (
@@ -67,7 +71,8 @@ const ProfileSkeleton = () => (
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, signOut, loading: authLoading } = useAuth();
+  const { profile, signOut, loading: authLoading, updateProfile } = useAuth();
+  const [uploading, setUploading] = useState(false);
 
   const profileMenuItems = [
     {
@@ -87,6 +92,190 @@ export default function ProfileScreen() {
     { icon: Shield, label: 'Privacy & Safety', color: '#9cdcb8', onPress: () => router.push('/privacy-policies') },
     { icon: HelpCircle, label: 'Help & Support', color: '#84a7f6', onPress: () => router.push('/help-support') },
   ];
+
+  const pickImage = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images.');
+        return;
+      }
+
+      // Launch image picker - SIMPLIFIED: Remove mediaTypes or use correct property
+      const result = await ImagePicker.launchImageLibraryAsync({
+        // Try one of these options:
+        // Option 1: Remove mediaTypes entirely (it defaults to images)
+        // Option 2: Use string format
+        mediaTypes: 'images', // Simple string format
+        // Option 3: Use array format
+        // mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  // Alternative: Check what properties are available
+  const pickImageAlternative = async () => {
+    try {
+      console.log('ImagePicker object:', ImagePicker);
+      console.log('Available properties:', Object.keys(ImagePicker));
+      
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images.');
+        return;
+      }
+
+      // Try different approaches
+      let result;
+      
+      // Approach 1: No mediaTypes property
+      result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await uploadImage(result.assets[0].uri);
+        return;
+      }
+      
+    } catch (error) {
+      console.error('Alternative picker error:', error);
+      Alert.alert('Error', 'Failed to pick image. Please check console for details.');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    try {
+      setUploading(true);
+      
+      // Check if profile exists and has an ID
+      if (!profile?.id) {
+        Alert.alert('Error', 'Profile not found. Please try logging out and back in.');
+        return;
+      }
+
+      console.log('Starting upload for user:', profile.id);
+
+      // Convert image to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Generate unique filename using user ID
+      const fileName = `${profile.id}_${Date.now()}.jpg`;
+      
+      console.log('Uploading file:', fileName);
+
+      // Try different buckets
+      let uploadSuccessful = false;
+      let publicUrl = '';
+      
+      // Try 'avatars' bucket first (common default)
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, blob, {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+          
+          if (urlData?.publicUrl) {
+            publicUrl = urlData.publicUrl;
+            uploadSuccessful = true;
+            console.log('Uploaded to avatars bucket:', publicUrl);
+          }
+        }
+      } catch (avatarError) {
+        console.log('Avatars bucket failed, trying profile-pictures...');
+      }
+
+      // If avatars bucket failed, try profile-pictures
+      if (!uploadSuccessful) {
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('profile-pictures')
+            .upload(fileName, blob, {
+              contentType: 'image/jpeg',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error('Profile-pictures upload error:', uploadError);
+            throw new Error(`Storage upload failed: ${uploadError.message}`);
+          }
+
+          const { data: urlData } = supabase.storage
+            .from('profile-pictures')
+            .getPublicUrl(fileName);
+          
+          if (!urlData?.publicUrl) {
+            throw new Error('Failed to get public URL');
+          }
+          
+          publicUrl = urlData.publicUrl;
+          uploadSuccessful = true;
+          console.log('Uploaded to profile-pictures bucket:', publicUrl);
+        } catch (profilePicturesError) {
+          console.error('Both buckets failed:', profilePicturesError);
+          throw profilePicturesError;
+        }
+      }
+
+      // Update profile in database using upsert
+      console.log('Updating profile with URL:', publicUrl);
+      
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: profile.id,
+          profile_picture_url: publicUrl,
+          updated_at: new Date().toISOString(),
+          // Include existing profile data to prevent overwriting
+          first_name: profile.first_name || '',
+          last_name: profile.last_name || '',
+          email: profile.email || '',
+          created_at: profile.created_at || new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
+
+      if (upsertError) {
+        console.error('Upsert error:', upsertError);
+        throw new Error(`Database update failed: ${upsertError.message}`);
+      }
+
+      console.log('Profile updated successfully');
+
+      // Refresh profile data
+      if (updateProfile) {
+        await updateProfile();
+      }
+
+      Alert.alert('Success', 'Profile picture updated successfully!');
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', `Failed to upload image: ${error.message || 'Please try again.'}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -137,23 +326,32 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              {profile.profile_picture_url ? (
-                <Image
-                  source={{ uri: profile.profile_picture_url }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {getInitials(profile.first_name, profile.last_name)}
-                  </Text>
-                </View>
-              )}
-              <Pressable
-                style={styles.editAvatarButton}
-                onPress={() => router.push('/profile/edit')}
+              <Pressable 
+                style={styles.avatarWrapper}
+                onPress={pickImage} // Try pickImageAlternative if this doesn't work
+                disabled={uploading}
               >
-                <Edit3 size={14} color="#ffffff" />
+                {uploading ? (
+                  <View style={[styles.avatar, styles.avatarUploading]}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  </View>
+                ) : profile.profile_picture_url ? (
+                  <Image
+                    source={{ uri: profile.profile_picture_url }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                      {getInitials(profile.first_name, profile.last_name)}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Camera icon overlay */}
+                <View style={styles.cameraIconContainer}>
+                  <Camera size={14} color="#FFFFFF" />
+                </View>
               </Pressable>
             </View>
             <View style={styles.profileInfo}>
@@ -170,6 +368,15 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Upload prompt */}
+          {!profile.profile_picture_url && !uploading && (
+            <Pressable style={styles.uploadPrompt} onPress={pickImage}>
+              <Text style={styles.uploadPromptText}>
+                Add a profile picture
+              </Text>
+            </Pressable>
+          )}
 
           {/* Contact Information */}
           <View style={styles.contactSection}>
@@ -257,7 +464,7 @@ const styles = StyleSheet.create({
     flex: 1 
   },
   scrollContent: {
-    paddingBottom: 40, // Extra padding for better scroll
+    paddingBottom: 40,
   },
   profileSection: {
     backgroundColor: '#ffffff',
@@ -270,37 +477,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 24,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   avatarContainer: { 
     position: 'relative', 
     marginRight: 16 
   },
+  avatarWrapper: {
+    position: 'relative',
+  },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#bd84f6',
+    backgroundColor: '#4F46E5',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarUploading: {
+    backgroundColor: '#6B7280',
   },
   avatarText: { 
-    color: '#ffffff', 
+    color: '#FFFFFF', 
     fontSize: 24, 
     fontWeight: 'bold' 
   },
-  editAvatarButton: {
+  cameraIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#374151',
+    backgroundColor: '#4F46E5',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#ffffff',
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   profileInfo: { 
     flex: 1 
@@ -319,6 +544,23 @@ const styles = StyleSheet.create({
   memberSince: { 
     fontSize: 14, 
     color: '#9ca3af' 
+  },
+  uploadPrompt: {
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  uploadPromptText: {
+    color: '#4F46E5',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   contactSection: { 
     paddingHorizontal: 20, 
@@ -392,7 +634,7 @@ const styles = StyleSheet.create({
     marginLeft: 8 
   },
   bottomPadding: {
-    height: 60, // Extra space at bottom for better scrolling
+    height: 60,
   },
   skeletonText: { 
     borderRadius: 4, 

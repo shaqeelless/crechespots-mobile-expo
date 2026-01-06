@@ -8,11 +8,14 @@ import {
   Animated,
   Dimensions,
   Image,
+  SafeAreaView,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { User, Settings, CreditCard, CircleHelp, Shield, LogOut, X, Star, Calendar, MapPin } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface SideMenuProps {
   visible: boolean;
@@ -66,9 +69,14 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
       visible={visible}
       transparent
       animationType="none"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
+        <StatusBar 
+          backgroundColor="rgba(0, 0, 0, 0.5)" 
+          barStyle="light-content"
+        />
         <Pressable style={styles.backdrop} onPress={onClose} />
         
         <Animated.View 
@@ -79,46 +87,70 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
             }
           ]}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Image 
-                source={require('@/assets/images/SplashScreen.png')} // Replace with your actual logo path
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
+          <SafeAreaView style={styles.safeArea}>
+            {/* Header with close button */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <Image 
+                  source={require('@/assets/images/SplashScreen.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Pressable style={styles.closeButton} onPress={onClose}>
+                <X size={24} color="#374151" />
+              </Pressable>
             </View>
-          </View>
 
+            {/* User Info Section - Optional, add if you have user data */}
+            {/* <View style={styles.userInfo}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>JD</Text>
+              </View>
+              <View>
+                <Text style={styles.userName}>John Doe</Text>
+                <Text style={styles.userEmail}>john@example.com</Text>
+              </View>
+            </View> */}
 
-          {/* Menu Items */}
-          <View style={styles.menuItems}>
-            {menuItems.map((item, index) => {
-              const IconComponent = item.icon;
-              return (
-                <Pressable 
-                  key={index} 
-                  style={styles.menuItem}
-                  onPress={() => handleMenuItemPress(item.route)}
-                >
-                  <View style={[styles.menuIcon, { backgroundColor: item.color }]}>
-                    <IconComponent size={20} color="#ffffff" />
-                  </View>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+            {/* Menu Items */}
+            <View style={styles.menuItems}>
+              {menuItems.map((item, index) => {
+                const IconComponent = item.icon;
+                return (
+                  <Pressable 
+                    key={index} 
+                    style={({ pressed }) => [
+                      styles.menuItem,
+                      pressed && styles.menuItemPressed
+                    ]}
+                    onPress={() => handleMenuItemPress(item.route)}
+                  >
+                    <View style={[styles.menuIcon, { backgroundColor: item.color }]}>
+                      <IconComponent size={20} color="#ffffff" />
+                    </View>
+                    <Text style={styles.menuLabel}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Pressable style={styles.logoutButton} onPress={handleLogout}>
-              <LogOut size={20} color="#ef4444" />
-              <Text style={styles.logoutText}>Sign Out</Text>
-            </Pressable>
-            
-            <Text style={styles.version}>Version 1.0.1</Text>
-          </View>
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Pressable 
+                style={({ pressed }) => [
+                  styles.logoutButton,
+                  pressed && styles.logoutButtonPressed
+                ]} 
+                onPress={handleLogout}
+              >
+                <LogOut size={20} color="#ef4444" />
+                <Text style={styles.logoutText}>Sign Out</Text>
+              </Pressable>
+              
+              <Text style={styles.version}>Version 1.0.1</Text>
+            </View>
+          </SafeAreaView>
         </Animated.View>
       </View>
     </Modal>
@@ -129,71 +161,70 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    flexDirection: 'row',
   },
   backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  safeArea: {
     flex: 1,
   },
   menuContainer: {
     width: width * 0.8,
     maxWidth: 320,
     backgroundColor: '#ffffff',
-    paddingTop: 60,
-    paddingBottom: 32,
+    height: '100%',
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  letterBlock: {
-    width: 20,
-    height: 20,
-    borderRadius: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 1,
-    opacity: 0.9,
-  },
-  letterText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  logoSubtext: {
-    color: '#374151',
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f9fafb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoImage: {
-    width: 200,
-    height: 60,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    marginBottom: 16,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+  },
+  logoImage: {
+    width: 180,
+    height: 50,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f9fafb',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
   avatar: {
     width: 60,
@@ -213,20 +244,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#374151',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
     color: '#6b7280',
   },
   menuItems: {
-    flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  menuItemPressed: {
+    backgroundColor: '#f9fafb',
   },
   menuIcon: {
     width: 36,
@@ -235,7 +270,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
-    opacity: 0.9,
   },
   menuLabel: {
     fontSize: 16,
@@ -243,15 +277,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footer: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    marginTop: 'auto',
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  logoutButtonPressed: {
+    backgroundColor: '#fef2f2',
   },
   logoutText: {
     fontSize: 16,
