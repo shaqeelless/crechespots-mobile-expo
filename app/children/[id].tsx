@@ -939,17 +939,6 @@ export default function ChildDetailsScreen() {
             </View>
             <Text style={styles.actionText}>Parents</Text>
           </Pressable>
-          {!child.creche_id && (
-            <Pressable 
-              style={styles.actionButton}
-              onPress={() => router.push(`/creches/register/${child.id}`)}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: '#10b981' }]}>
-                <School size={20} color="#ffffff" />
-              </View>
-              <Text style={styles.actionText}>Register</Text>
-            </Pressable>
-          )}
         </View>
       </View>
     </View>
@@ -1393,14 +1382,14 @@ export default function ChildDetailsScreen() {
   // Keep all your existing styles below...
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+  
     backgroundColor: '#f8fafc',
   },
     content: {
-    flex: 1,
+        flex: 1,
   },
     contentContainer: {
-    flexGrow: 1,
+        flex: 1,
   },
   header: {
     flexDirection: 'row',
