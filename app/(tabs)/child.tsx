@@ -21,12 +21,16 @@ const SWIPE_OUT_DURATION = 200;
 
 interface Child {
   id: string;
+  user_id: string;
+  creche_id: string | null;
   first_name: string;
   last_name: string;
   date_of_birth: string;
   gender: string;
   profile_picture_url: string;
   created_at: string;
+  updated_at: string;
+  share_code: string | null;
 }
 
 const ChildCardSkeleton = () => (
@@ -64,177 +68,6 @@ const getAvatarColor = (firstName: string, lastName: string) => {
   
   const index = Math.abs(hash) % colors.length;
   return colors[index];
-};
-
-// Swipeable Child Card Component
-const SwipeableChildCard = ({ 
-  child, 
-  onEdit, 
-  onView, 
-  onDelete 
-}: { 
-  child: Child;
-  onEdit: () => void;
-  onView: () => void;
-  onDelete: () => void;
-}) => {
-  const position = new Animated.ValueXY();
-  const [isSwiped, setIsSwiped] = useState(false);
-
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => !isSwiped,
-    onMoveShouldSetPanResponder: (_, gestureState) => {
-      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy * 2);
-    },
-    onPanResponderMove: (_, gestureState) => {
-      if (gestureState.dx < 0) {
-        position.setValue({ x: Math.max(gestureState.dx, -100), y: 0 });
-      }
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dx < SWIPE_THRESHOLD) {
-        // Swipe left beyond threshold - show delete
-        Animated.spring(position, {
-          toValue: { x: -80, y: 0 },
-          useNativeDriver: false,
-        }).start();
-        setIsSwiped(true);
-      } else {
-        // Return to original position
-        resetPosition();
-      }
-    },
-  });
-
-  const resetPosition = () => {
-    Animated.spring(position, {
-      toValue: { x: 0, y: 0 },
-      useNativeDriver: false,
-    }).start();
-    setIsSwiped(false);
-  };
-
-  const handleCardPress = () => {
-    if (isSwiped) {
-      resetPosition();
-    } else {
-      onView();
-    }
-  };
-
-  const handleEditPress = (e: any) => {
-    e.stopPropagation();
-    if (isSwiped) {
-      resetPosition();
-    } else {
-      onEdit();
-    }
-  };
-
-  const cardStyle = {
-    transform: position.getTranslateTransform(),
-  };
-
-  return (
-    <View style={styles.swipeContainer}>
-      {/* Delete Background */}
-      {isSwiped && (
-        <View style={styles.deleteBackground}>
-          <Pressable 
-            style={styles.deleteButton}
-            onPress={onDelete}
-          >
-            <Trash2 size={20} color="#ffffff" />
-            <Text style={styles.deleteText}>Delete</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* Main Card */}
-      <Animated.View 
-        style={[styles.childCard, cardStyle]}
-        {...panResponder.panHandlers}
-      >
-        <Pressable 
-          style={styles.cardContent}
-          onPress={handleCardPress}
-        >
-          <View style={styles.avatarContainer}>
-            {child.profile_picture_url ? (
-              <Image 
-                source={{ uri: child.profile_picture_url }} 
-                style={styles.avatar} 
-                onError={(e) => {
-                  // If image fails to load, fall back to initials
-                  console.log('Image failed to load, using initials');
-                }}
-              />
-            ) : (
-              <View 
-                style={[
-                  styles.avatar, 
-                  styles.avatarPlaceholder,
-                  { backgroundColor: getAvatarColor(child.first_name, child.last_name) }
-                ]}
-              >
-                <Text style={styles.avatarText}>
-                  {getInitials(child.first_name, child.last_name)}
-                </Text>
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.infoContainer}>
-            <Text style={styles.childName}>
-              {child.first_name} {child.last_name}
-            </Text>
-            
-            <View style={styles.detailsContainer}>
-              <View style={styles.detailItem}>
-                <Calendar size={14} color="#6b7280" />
-                <Text style={styles.detailText}>
-                  {calculateAge(child.date_of_birth)} years
-                </Text>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <User size={14} color="#6b7280" />
-                <Text style={styles.detailText}>{child.gender}</Text>
-              </View>
-            </View>
-            
-            <Text style={styles.birthDate}>
-              Born {new Date(child.date_of_birth).toLocaleDateString()}
-            </Text>
-          </View>
-
-                    <View 
-            style={styles.editButton}
-          >
-            <Edit3 size={18} color="#bd84f6" />
-          </View>
-          
-        </Pressable>
-      </Animated.View>
-    </View>
-  );
 };
 
 // Enhanced Child Card with better image handling
@@ -348,11 +181,12 @@ const EnhancedChildCard = ({
             </Text>
           </View>
           
-          <View 
+          <Pressable 
             style={styles.editButton}
+            onPress={onEdit}
           >
             <Edit3 size={18} color="#bd84f6" />
-          </View>
+          </Pressable>
         </Pressable>
       </View>
     </View>
@@ -364,24 +198,63 @@ export default function ChildrenScreen() {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchChildren();
-  }, []);
+    getCurrentUser();
+    
+    // Set up focus listener to refresh when returning to screen
+    const unsubscribe = router.addListener('focus', () => {
+      if (userId) {
+        fetchChildren(userId);
+      }
+    });
 
-  const fetchChildren = async () => {
+    return unsubscribe;
+  }, [router, userId]);
+
+  const getCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        fetchChildren(user.id);
+      } else {
+        setLoading(false);
+        Alert.alert('Authentication Required', 'Please sign in to view your children');
+        router.push('/auth');
+      }
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Failed to load user information');
+    }
+  };
+
+  const fetchChildren = async (currentUserId: string) => {
     try {
       setLoading(true);
+      
+      // Fetch only children belonging to the current user
       const { data, error } = await supabase
         .from('children')
         .select('*')
+        .eq('user_id', currentUserId)  // Filter by the current user's ID
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
       setChildren(data || []);
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error fetching children:', error);
-      Alert.alert('Error', 'Failed to load children profiles');
+      Alert.alert(
+        'Error', 
+        error.message || 'Failed to load children profiles. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -409,6 +282,26 @@ export default function ChildrenScreen() {
     try {
       setDeletingId(childId);
       
+      // Get current user to verify ownership
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // First, verify this child belongs to the current user
+      const { data: childData, error: fetchError } = await supabase
+        .from('children')
+        .select('user_id')
+        .eq('id', childId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      
+      if (childData.user_id !== user.id) {
+        Alert.alert('Error', 'You do not have permission to delete this child profile');
+        return;
+      }
+
       // Check for active applications
       const { data: applications, error: appsError } = await supabase
         .from('applications')
@@ -430,10 +323,12 @@ export default function ChildrenScreen() {
       const { error } = await supabase
         .from('children')
         .delete()
-        .eq('id', childId);
+        .eq('id', childId)
+        .eq('user_id', user.id); // Additional security check
 
       if (error) throw error;
 
+      // Remove from local state
       setChildren(prev => prev.filter(child => child.id !== childId));
       
       Alert.alert('Success', 'Profile deleted successfully');
@@ -453,29 +348,53 @@ export default function ChildrenScreen() {
     router.push(`/children/${childId}`);
   };
 
+  const handleAddChild = () => {
+    router.push('/children/add');
+  };
+
+  const handleJoinChild = () => {
+    router.push('/join-child');
+  };
+
+  const refreshChildren = () => {
+    if (userId) {
+      fetchChildren(userId);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>My Children</Text>
+        <View style={styles.headerActions}>
+          <Pressable 
+            style={styles.headerButton}
+            onPress={handleJoinChild}
+          >
+            <LinkIcon size={20} color="#8b5cf6" />
+          </Pressable>
+          <Pressable 
+            style={styles.headerButton}
+            onPress={handleAddChild}
+          >
+            <Plus size={20} color="#8b5cf6" />
+          </Pressable>
+        </View>
+      </View>
 
-<View style={styles.header}>
-  <Text style={styles.title}>My Children</Text>
-  <View style={styles.headerActions}>
-    <Pressable 
-      style={styles.headerButton}
-      onPress={() => router.push('/join-child')}
-    >
-      <LinkIcon size={20} color="#8b5cf6" />
-    </Pressable>
-    <Pressable 
-      style={styles.headerButton}
-      onPress={() => router.push('/children/add')}
-    >
-      <Plus size={20} color="#8b5cf6" />
-    </Pressable>
-  </View>
-</View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refreshChildren}
+            colors={['#8b5cf6']}
+            tintColor="#8b5cf6"
+          />
+        }
+      >
         {loading ? (
           <View style={styles.childrenList}>
             <ChildCardSkeleton />
@@ -504,7 +423,7 @@ export default function ChildrenScreen() {
             </Text>
             <Pressable 
               style={styles.primaryButton}
-              onPress={() => router.push('/children/add')}
+              onPress={handleAddChild}
             >
               <Plus size={20} color="#ffffff" />
               <Text style={styles.primaryButtonText}>Add First Child</Text>
@@ -541,20 +460,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1f2937',
   },
-  addButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -758,20 +674,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-
-   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8, // This controls the space between buttons
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   
   // Loading Overlay
