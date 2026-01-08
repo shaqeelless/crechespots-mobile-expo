@@ -1386,10 +1386,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
     content: {
-        flex: 1,
+    flex: 1,
   },
     contentContainer: {
-        flex: 1,
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
