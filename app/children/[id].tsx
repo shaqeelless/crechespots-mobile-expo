@@ -895,52 +895,6 @@ export default function ChildDetailsScreen() {
         </View>
       )}
 
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionsGrid}>
-          <Pressable style={styles.actionButton} onPress={() => setActiveSection('applications')}>
-            <View style={[styles.actionIcon, { backgroundColor: '#8b5cf6' }]}>
-              <FileText size={20} color="#ffffff" />
-            </View>
-            <Text style={styles.actionText}>Applications</Text>
-          </Pressable>
-          {isChildEnrolledAsStudent() && (
-            <>
-              <Pressable style={styles.actionButton} onPress={() => setActiveSection('attendance')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#06b6d4' }]}>
-                  <CalendarClock size={20} color="#ffffff" />
-                </View>
-                <Text style={styles.actionText}>Attendance</Text>
-              </Pressable>
-              <Pressable style={styles.actionButton} onPress={() => setActiveSection('medical')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#10b981' }]}>
-                  <Heart size={20} color="#ffffff" />
-                </View>
-                <Text style={styles.actionText}>Medical</Text>
-              </Pressable>
-              <Pressable style={styles.actionButton} onPress={() => setActiveSection('finance')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#f59e0b' }]}>
-                  <FileText size={20} color="#ffffff" />
-                </View>
-                <Text style={styles.actionText}>Finance</Text>
-              </Pressable>
-            </>
-          )}
-          <Pressable style={styles.actionButton} onPress={() => setActiveSection('notes')}>
-            <View style={[styles.actionIcon, { backgroundColor: '#8b5cf6' }]}>
-              <BookOpen size={20} color="#ffffff" />
-            </View>
-            <Text style={styles.actionText}>Notes</Text>
-          </Pressable>
-          <Pressable style={styles.actionButton} onPress={() => setActiveSection('parents')}>
-            <View style={[styles.actionIcon, { backgroundColor: '#06b6d4' }]}>
-              <Users size={20} color="#ffffff" />
-            </View>
-            <Text style={styles.actionText}>Parents</Text>
-          </Pressable>
-        </View>
-      </View>
     </View>
   );
 
