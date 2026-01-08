@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, Edit3, Calendar, User, Trash2, LinkIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
@@ -197,43 +198,53 @@ export default function ChildrenScreen() {
   const router = useRouter();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Get current user on component mount
   useEffect(() => {
     getCurrentUser();
-    
-    // Set up focus listener to refresh when returning to screen
-    const unsubscribe = router.addListener('focus', () => {
+  }, []);
+
+  // Set up focus listener to refresh when returning to screen
+  useFocusEffect(
+    useCallback(() => {
       if (userId) {
         fetchChildren(userId);
       }
-    });
-
-    return unsubscribe;
-  }, [router, userId]);
+    }, [userId])
+  );
 
   const getCurrentUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
+      
       if (user) {
         setUserId(user.id);
-        fetchChildren(user.id);
+        await fetchChildren(user.id);
       } else {
         setLoading(false);
         Alert.alert('Authentication Required', 'Please sign in to view your children');
         router.push('/auth');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting current user:', error);
       setLoading(false);
-      Alert.alert('Error', 'Failed to load user information');
+      Alert.alert('Error', 'Failed to load user information. Please try again.');
     }
   };
 
   const fetchChildren = async (currentUserId: string) => {
     try {
       setLoading(true);
+      
+      console.log('Fetching children for user:', currentUserId);
       
       // Fetch only children belonging to the current user
       const { data, error } = await supabase
@@ -243,10 +254,11 @@ export default function ChildrenScreen() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
+        console.error('Supabase query error:', error);
         throw error;
       }
       
+      console.log('Fetched children:', data);
       setChildren(data || []);
       
     } catch (error: any) {
@@ -257,13 +269,23 @@ export default function ChildrenScreen() {
       );
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (userId) {
+      await fetchChildren(userId);
+    } else {
+      await getCurrentUser();
     }
   };
 
   const handleDeleteChild = (child: Child) => {
     Alert.alert(
       'Delete Profile',
-      `Remove ${child.first_name}'s profile? This action cannot be undone.`,
+      `Are you sure you want to remove ${child.first_name}'s profile? This action cannot be undone.`,
       [
         {
           text: 'Cancel',
@@ -272,13 +294,13 @@ export default function ChildrenScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => confirmDeleteChild(child.id),
+          onPress: () => confirmDeleteChild(child.id, child.first_name),
         },
       ]
     );
   };
 
-  const confirmDeleteChild = async (childId: string) => {
+  const confirmDeleteChild = async (childId: string, childName: string) => {
     try {
       setDeletingId(childId);
       
@@ -313,7 +335,7 @@ export default function ChildrenScreen() {
       if (applications && applications.length > 0) {
         Alert.alert(
           'Active Applications',
-          'Please withdraw all applications before deleting this profile.',
+          `${childName} has active applications. Please withdraw all applications before deleting this profile.`,
           [{ text: 'OK' }]
         );
         return;
@@ -331,10 +353,10 @@ export default function ChildrenScreen() {
       // Remove from local state
       setChildren(prev => prev.filter(child => child.id !== childId));
       
-      Alert.alert('Success', 'Profile deleted successfully');
-    } catch (error) {
+      Alert.alert('Success', `${childName}'s profile has been deleted`);
+    } catch (error: any) {
       console.error('Error deleting child:', error);
-      Alert.alert('Error', 'Failed to delete profile');
+      Alert.alert('Error', error.message || 'Failed to delete profile');
     } finally {
       setDeletingId(null);
     }
@@ -354,12 +376,6 @@ export default function ChildrenScreen() {
 
   const handleJoinChild = () => {
     router.push('/join-child');
-  };
-
-  const refreshChildren = () => {
-    if (userId) {
-      fetchChildren(userId);
-    }
   };
 
   return (
@@ -388,14 +404,14 @@ export default function ChildrenScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={refreshChildren}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             colors={['#8b5cf6']}
             tintColor="#8b5cf6"
           />
         }
       >
-        {loading ? (
+        {loading && !refreshing ? (
           <View style={styles.childrenList}>
             <ChildCardSkeleton />
             <ChildCardSkeleton />
@@ -432,7 +448,7 @@ export default function ChildrenScreen() {
         )}
       </ScrollView>
 
-      {/* Loading Overlay */}
+      {/* Loading Overlay for deletion */}
       {deletingId && (
         <View style={styles.overlay}>
           <View style={styles.loadingCard}>
