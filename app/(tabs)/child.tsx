@@ -13,7 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Plus, Edit3, Calendar, User, Trash2, LinkIcon } from 'lucide-react-native';
+import { ArrowLeft, Plus, Edit3, Calendar, User, Trash2, LinkIcon, Users } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -32,6 +32,12 @@ interface Child {
   created_at: string;
   updated_at: string;
   share_code: string | null;
+  relationship?: 'owner' | 'parent' | 'guardian' | 'relative';
+  permissions?: {
+    edit: boolean;
+    view: boolean;
+    manage: boolean;
+  };
 }
 
 const ChildCardSkeleton = () => (
@@ -105,18 +111,23 @@ const EnhancedChildCard = ({
 
   const shouldShowInitials = !child.profile_picture_url || imageError;
 
+  // Check if user can edit this child
+  const canEdit = child.relationship === 'owner' || (child.permissions && child.permissions.edit === true);
+
   return (
     <View style={styles.swipeContainer}>
-      {/* Delete Background */}
-      <View style={styles.deleteBackground}>
-        <Pressable 
-          style={styles.deleteButton}
-          onPress={onDelete}
-        >
-          <Trash2 size={20} color="#ffffff" />
-          <Text style={styles.deleteText}>Delete</Text>
-        </Pressable>
-      </View>
+      {/* Delete Background - Only show if user is owner */}
+      {child.relationship === 'owner' && (
+        <View style={styles.deleteBackground}>
+          <Pressable 
+            style={styles.deleteButton}
+            onPress={onDelete}
+          >
+            <Trash2 size={20} color="#ffffff" />
+            <Text style={styles.deleteText}>Delete</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Main Card */}
       <View style={styles.childCard}>
@@ -136,18 +147,30 @@ const EnhancedChildCard = ({
                 <Text style={styles.avatarText}>
                   {getInitials(child.first_name, child.last_name)}
                 </Text>
+                {child.relationship !== 'owner' && (
+                  <View style={styles.sharedBadge}>
+                    <Users size={10} color="#ffffff" />
+                  </View>
+                )}
               </View>
             ) : (
-              <Image 
-                source={{ uri: child.profile_picture_url }} 
-                style={styles.avatar}
-                onLoadStart={() => setImageLoading(true)}
-                onLoadEnd={() => setImageLoading(false)}
-                onError={() => {
-                  setImageError(true);
-                  setImageLoading(false);
-                }}
-              />
+              <View style={styles.avatarImageContainer}>
+                <Image 
+                  source={{ uri: child.profile_picture_url }} 
+                  style={styles.avatar}
+                  onLoadStart={() => setImageLoading(true)}
+                  onLoadEnd={() => setImageLoading(false)}
+                  onError={() => {
+                    setImageError(true);
+                    setImageLoading(false);
+                  }}
+                />
+                {child.relationship !== 'owner' && (
+                  <View style={styles.sharedBadge}>
+                    <Users size={10} color="#ffffff" />
+                  </View>
+                )}
+              </View>
             )}
             
             {/* Loading indicator for image */}
@@ -159,9 +182,18 @@ const EnhancedChildCard = ({
           </View>
           
           <View style={styles.infoContainer}>
-            <Text style={styles.childName}>
-              {child.first_name} {child.last_name}
-            </Text>
+            <View style={styles.nameContainer}>
+              <Text style={styles.childName}>
+                {child.first_name} {child.last_name}
+              </Text>
+              {child.relationship !== 'owner' && (
+                <View style={styles.relationshipBadge}>
+                  <Text style={styles.relationshipText}>
+                    {child.relationship === 'parent' ? 'Shared' : child.relationship || 'Shared'}
+                  </Text>
+                </View>
+              )}
+            </View>
             
             <View style={styles.detailsContainer}>
               <View style={styles.detailItem}>
@@ -183,10 +215,11 @@ const EnhancedChildCard = ({
           </View>
           
           <Pressable 
-            style={styles.editButton}
+            style={[styles.editButton, !canEdit && styles.editButtonDisabled]}
             onPress={onEdit}
+            disabled={!canEdit}
           >
-            <Edit3 size={18} color="#bd84f6" />
+            <Edit3 size={18} color={canEdit ? "#bd84f6" : "#d1d5db"} />
           </Pressable>
         </Pressable>
       </View>
@@ -246,20 +279,71 @@ export default function ChildrenScreen() {
       
       console.log('Fetching children for user:', currentUserId);
       
-      // Fetch only children belonging to the current user
-      const { data, error } = await supabase
+      // Fetch children that the user OWNS (where user_id = currentUserId)
+      const { data: ownedChildren, error: ownedError } = await supabase
         .from('children')
         .select('*')
-        .eq('user_id', currentUserId)  // Filter by the current user's ID
+        .eq('user_id', currentUserId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Supabase query error:', error);
-        throw error;
+      if (ownedError) {
+        console.error('Error fetching owned children:', ownedError);
+        throw ownedError;
       }
+
+      // Fetch children that the user has access to through child_parents table
+      const { data: sharedChildren, error: sharedError } = await supabase
+        .from('child_parents')
+        .select(`
+          child:children (*),
+          relationship,
+          permissions,
+          is_verified
+        `)
+        .eq('user_id', currentUserId)
+        .eq('is_verified', true)  // Only show verified relationships
+        .order('created_at', { ascending: false });
+
+      if (sharedError) {
+        console.error('Error fetching shared children:', sharedError);
+        throw sharedError;
+      }
+
+      // Process owned children
+      const ownedChildrenWithMeta = (ownedChildren || []).map(child => ({
+        ...child,
+        relationship: 'owner' as const,
+        permissions: {
+          edit: true,
+          view: true,
+          manage: true
+        }
+      }));
+
+      // Process shared children
+      const sharedChildrenWithMeta = (sharedChildren || [])
+        .filter(item => item.child)  // Filter out null children
+        .map(item => ({
+          ...item.child,
+          relationship: item.relationship || 'parent',
+          permissions: item.permissions || { edit: false, view: true, manage: false }
+        }));
+
+      // Combine both lists and remove duplicates (in case a child appears in both)
+      const allChildren = [...ownedChildrenWithMeta, ...sharedChildrenWithMeta];
       
-      console.log('Fetched children:', data);
-      setChildren(data || []);
+      // Remove duplicates based on child id
+      const uniqueChildren = Array.from(
+        new Map(allChildren.map(child => [child.id, child])).values()
+      );
+
+      console.log('Fetched children:', {
+        owned: ownedChildrenWithMeta.length,
+        shared: sharedChildrenWithMeta.length,
+        total: uniqueChildren.length
+      });
+      
+      setChildren(uniqueChildren);
       
     } catch (error: any) {
       console.error('Error fetching children:', error);
@@ -283,9 +367,19 @@ export default function ChildrenScreen() {
   };
 
   const handleDeleteChild = (child: Child) => {
+    // Only allow deletion if user is the owner
+    if (child.relationship !== 'owner') {
+      Alert.alert(
+        'Permission Denied',
+        `You cannot delete ${child.first_name}'s profile as you are not the primary parent.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Delete Profile',
-      `Are you sure you want to remove ${child.first_name}'s profile? This action cannot be undone.`,
+      `Are you sure you want to remove ${child.first_name}'s profile? This will remove access for all linked parents.`,
       [
         {
           text: 'Cancel',
@@ -310,7 +404,7 @@ export default function ChildrenScreen() {
         throw new Error('User not authenticated');
       }
 
-      // First, verify this child belongs to the current user
+      // Verify this child belongs to the current user as owner
       const { data: childData, error: fetchError } = await supabase
         .from('children')
         .select('user_id')
@@ -341,7 +435,7 @@ export default function ChildrenScreen() {
         return;
       }
 
-      // Delete child profile
+      // Delete child profile (this will cascade to child_parents due to foreign key constraint)
       const { error } = await supabase
         .from('children')
         .delete()
@@ -362,8 +456,20 @@ export default function ChildrenScreen() {
     }
   };
 
-  const handleEditChild = (childId: string) => {
-    router.push(`/children/${childId}/edit`);
+  const handleEditChild = (child: Child) => {
+    // Check if user has edit permissions
+    const canEdit = child.relationship === 'owner' || (child.permissions && child.permissions.edit === true);
+    
+    if (!canEdit) {
+      Alert.alert(
+        'Permission Denied',
+        `You do not have permission to edit ${child.first_name}'s profile.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    router.push(`/children/${child.id}/edit`);
   };
 
   const handleViewChild = (childId: string) => {
@@ -418,32 +524,57 @@ export default function ChildrenScreen() {
           </View>
         ) : children.length > 0 ? (
           <View style={styles.childrenList}>
-            {children.map((child) => (
-              <EnhancedChildCard
-                key={child.id}
-                child={child}
-                onEdit={() => handleEditChild(child.id)}
-                onView={() => handleViewChild(child.id)}
-                onDelete={() => handleDeleteChild(child)}
-              />
-            ))}
+            {/* Show owned children first */}
+            {children
+              .filter(child => child.relationship === 'owner')
+              .map((child) => (
+                <EnhancedChildCard
+                  key={child.id}
+                  child={child}
+                  onEdit={() => handleEditChild(child)}
+                  onView={() => handleViewChild(child.id)}
+                  onDelete={() => handleDeleteChild(child)}
+                />
+              ))}
+            
+            {/* Then show shared children */}
+            {children
+              .filter(child => child.relationship !== 'owner')
+              .map((child) => (
+                <EnhancedChildCard
+                  key={child.id}
+                  child={child}
+                  onEdit={() => handleEditChild(child)}
+                  onView={() => handleViewChild(child.id)}
+                  onDelete={() => handleDeleteChild(child)}
+                />
+              ))}
           </View>
         ) : (
           <View style={styles.emptyState}>
             <View style={styles.emptyIllustration}>
               <User size={64} color="#d1d5db" />
             </View>
-            <Text style={styles.emptyTitle}>No Children Added</Text>
+            <Text style={styles.emptyTitle}>No Children</Text>
             <Text style={styles.emptySubtitle}>
-              Add your children to start applying to creches
+              Add your children or join existing profiles to get started
             </Text>
-            <Pressable 
-              style={styles.primaryButton}
-              onPress={handleAddChild}
-            >
-              <Plus size={20} color="#ffffff" />
-              <Text style={styles.primaryButtonText}>Add First Child</Text>
-            </Pressable>
+            <View style={styles.buttonGroup}>
+              <Pressable 
+                style={[styles.primaryButton, styles.joinButton]}
+                onPress={handleJoinChild}
+              >
+                <LinkIcon size={20} color="#ffffff" />
+                <Text style={styles.primaryButtonText}>Join Child</Text>
+              </Pressable>
+              <Pressable 
+                style={styles.primaryButton}
+                onPress={handleAddChild}
+              >
+                <Plus size={20} color="#ffffff" />
+                <Text style={styles.primaryButtonText}>Add Child</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -545,6 +676,9 @@ const styles = StyleSheet.create({
     marginRight: 16,
     position: 'relative',
   },
+  avatarImageContainer: {
+    position: 'relative',
+  },
   avatar: {
     width: 56,
     height: 56,
@@ -553,6 +687,7 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   avatarLoading: {
     position: 'absolute',
@@ -565,14 +700,44 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  sharedBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#8b5cf6',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
   infoContainer: {
     flex: 1,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    flexWrap: 'wrap',
   },
   childName: {
     fontSize: 17,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 6,
+  },
+  relationshipBadge: {
+    backgroundColor: '#f3e8ff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  relationshipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8b5cf6',
   },
   detailsContainer: {
     flexDirection: 'row',
@@ -602,6 +767,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  editButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+    borderColor: '#f3f4f6',
   },
   
   // Skeleton Styles
@@ -672,11 +841,17 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 32,
   },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    justifyContent: 'center',
+  },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#bd84f6',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
@@ -685,6 +860,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  joinButton: {
+    backgroundColor: '#8b5cf6',
   },
   primaryButtonText: {
     color: '#ffffff',
