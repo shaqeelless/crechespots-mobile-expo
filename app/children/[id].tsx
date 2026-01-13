@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Clipboard,
+  Share,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -30,6 +31,10 @@ import {
   Shield,
   MapPin,
   Users,
+  Share2,
+  UserPlus,
+  Mail,
+  ExternalLink,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -47,7 +52,7 @@ interface Child {
   allergies?: string;
   medical_conditions?: string;
   created_at: string;
-  parent_id: string;
+  user_id: string;
   creche_id: string;
   share_code?: string;
   creche?: {
@@ -57,6 +62,12 @@ interface Child {
     address: string;
   };
   parents?: ChildParent[];
+  relationship?: 'owner' | 'parent' | 'guardian' | 'relative';
+  permissions?: {
+    edit: boolean;
+    view: boolean;
+    manage: boolean;
+  };
 }
 
 interface ChildParent {
@@ -75,6 +86,28 @@ interface ChildParent {
     last_name: string;
     email: string;
     phone_number: string;
+  };
+}
+
+interface ChildInvite {
+  id: string;
+  child_id: string;
+  inviter_id: string;
+  invitee_email: string;
+  invitee_user_id: string | null;
+  share_code: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+  relationship: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  inviter?: {
+    first_name: string;
+    last_name: string;
+  };
+  invitee?: {
+    first_name: string;
+    last_name: string;
   };
 }
 
@@ -192,6 +225,7 @@ export default function ChildDetailsScreen() {
   const [applicationNotes, setApplicationNotes] = useState<ApplicationNote[]>([]);
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invites, setInvites] = useState<ChildInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('overview');
 
@@ -205,30 +239,75 @@ export default function ChildDetailsScreen() {
     try {
       setLoading(true);
 
-      // Fetch child details WITH current creche info AND parents
-      const { data: childData, error: childError } = await supabase
+      // Get current user
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      // First check if user has access to this child through ownership or child_parents
+      const { data: childAccess, error: accessError } = await supabase
         .from('children')
         .select(`
           *,
-          creche:creches(id, name, header_image, address)
+          creche:creches(id, name, header_image, address),
+          child_parents!inner(
+            relationship,
+            permissions,
+            is_verified
+          )
         `)
         .eq('id', id)
+        .or(`user_id.eq.${currentUser.id},child_parents.user_id.eq.${currentUser.id},child_parents.is_verified.eq.true`)
         .single();
 
-      if (childError) throw childError;
-      setChild(childData);
+      if (accessError) {
+        // Try without child_parents join - user might be owner
+        const { data: ownedChild, error: ownedError } = await supabase
+          .from('children')
+          .select(`
+            *,
+            creche:creches(id, name, header_image, address)
+          `)
+          .eq('id', id)
+          .eq('user_id', currentUser.id)
+          .single();
 
-      // Fetch all related data in parallel
+        if (ownedError) {
+          throw new Error('You do not have access to this child');
+        }
+
+        setChild({
+          ...ownedChild,
+          relationship: 'owner' as const,
+          permissions: {
+            edit: true,
+            view: true,
+            manage: true
+          }
+        });
+      } else {
+        // User has access through child_parents
+        const parentRecord = childAccess.child_parents[0];
+        setChild({
+          ...childAccess,
+          relationship: parentRecord.relationship || 'parent',
+          permissions: parentRecord.permissions || { edit: false, view: true, manage: false }
+        });
+      }
+
+      // Fetch all related data
       await Promise.all([
-        fetchApplications(childData.id),
-        fetchStudents(childData.id),
-        fetchInvoices(childData.id),
-        fetchChildParents(childData.id),
+        fetchApplications(id as string),
+        fetchStudents(id as string),
+        fetchInvoices(id as string),
+        fetchChildParents(id as string),
+        fetchChildInvites(id as string),
       ]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching child data:', error);
-      Alert.alert('Error', 'Failed to load child details');
+      Alert.alert('Error', error.message || 'Failed to load child details');
     } finally {
       setLoading(false);
     }
@@ -251,6 +330,30 @@ export default function ChildDetailsScreen() {
       setChild(prev => prev ? { ...prev, parents: data || [] } : null);
     } catch (error) {
       console.error('Error fetching child parents:', error);
+    }
+  };
+
+  const fetchChildInvites = async (childId: string) => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      // Fetch invites created by current user or pending invites for current user
+      const { data, error } = await supabase
+        .from('child_invites')
+        .select(`
+          *,
+          inviter:users!child_invites_inviter_id_fkey(first_name, last_name),
+          invitee:users!child_invites_invitee_user_id_fkey(first_name, last_name)
+        `)
+        .eq('child_id', childId)
+        .or(`inviter_id.eq.${currentUser.id},invitee_user_id.eq.${currentUser.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setInvites(data || []);
+    } catch (error) {
+      console.error('Error fetching child invites:', error);
     }
   };
 
@@ -467,6 +570,79 @@ export default function ChildDetailsScreen() {
     return '#ef4444';
   };
 
+  const handleShareCode = () => {
+    if (!child?.share_code) return;
+    
+    Alert.alert(
+      'Share Code',
+      `Share this code with other parents to link them to ${child.first_name}:`,
+      [
+        {
+          text: 'Copy',
+          onPress: () => {
+            Clipboard.setString(child.share_code!);
+            Alert.alert('Copied', 'Share code copied to clipboard');
+          }
+        },
+        {
+          text: 'Share',
+          onPress: async () => {
+            try {
+              await Share.share({
+                message: `Join me in managing ${child.first_name}'s profile on CrecheApp! Use this code: ${child.share_code}`,
+                title: `Join ${child.first_name}'s profile`
+              });
+            } catch (error) {
+              console.error('Error sharing:', error);
+            }
+          }
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
+  const handleInviteParent = () => {
+    router.push(`/children/${id}/share`);
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    try {
+      Alert.alert(
+        'Cancel Invitation',
+        'Are you sure you want to cancel this invitation?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Yes, Cancel',
+            style: 'destructive',
+            onPress: async () => {
+              const { error } = await supabase
+                .from('child_invites')
+                .update({ status: 'cancelled' })
+                .eq('id', inviteId);
+
+              if (error) throw error;
+
+              // Refresh invites
+              fetchChildInvites(id as string);
+              Alert.alert('Success', 'Invitation cancelled');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error cancelling invite:', error);
+      Alert.alert('Error', 'Failed to cancel invitation');
+    }
+  };
+
   // Render enrollment status badge
   const renderEnrollmentStatus = () => {
     const enrolled = isChildEnrolledAsStudent();
@@ -503,102 +679,31 @@ export default function ChildDetailsScreen() {
     }
   };
 
-  // Add Finance Section
-  const renderFinanceSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Finance</Text>
-        <Text style={styles.sectionSubtitle}>
-          {invoices.length} invoice(s) • {formatCurrency(invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0))} total
-        </Text>
-      </View>
-      
-      {invoices.length > 0 ? (
-        <>
-          {/* Summary Stats */}
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
-              <Text style={styles.statNumber}>
-                {formatCurrency(invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.total_amount || 0), 0))}
-              </Text>
-              <Text style={styles.statLabel}>Paid</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: '#f59e0b' }]}>
-              <Text style={styles.statNumber}>
-                {formatCurrency(invoices.filter(inv => inv.status === 'pending').reduce((sum, inv) => sum + (inv.total_amount || 0), 0))}
-              </Text>
-              <Text style={styles.statLabel}>Pending</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: '#ef4444' }]}>
-              <Text style={styles.statNumber}>
-                {formatCurrency(invoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + (inv.total_amount || 0), 0))}
-              </Text>
-              <Text style={styles.statLabel}>Overdue</Text>
-            </View>
-          </View>
-
-          {/* Invoices List */}
-          {invoices.map((invoice) => (
-            <Pressable 
-              key={invoice.id} 
-              style={styles.invoiceCard}
-              onPress={() => router.push(`/invoices/${invoice.id}`)}
-            >
-              <View style={styles.invoiceHeader}>
-                <Text style={styles.invoiceTitle}>{invoice.title}</Text>
-                <View style={[
-                  styles.invoiceStatusBadge,
-                  { backgroundColor: 
-                    invoice.status === 'paid' ? '#d1fae5' :
-                    invoice.status === 'pending' ? '#fef3c7' :
-                    '#fee2e2'
-                  }
-                ]}>
-                  <Text style={[
-                    styles.invoiceStatusText,
-                    { color: 
-                      invoice.status === 'paid' ? '#065f46' :
-                      invoice.status === 'pending' ? '#92400e' :
-                      '#991b1b'
-                    }
-                  ]}>
-                    {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.invoiceDate}>
-                {new Date(invoice.created_at).toLocaleDateString()}
-              </Text>
-              <Text style={styles.invoiceAmount}>
-                {formatCurrency(invoice.total_amount || 0)}
-              </Text>
-              {invoice.creches?.name && (
-                <Text style={styles.invoiceCreche}>
-                  {invoice.creches.name}
-                </Text>
-              )}
-            </Pressable>
-          ))}
-        </>
-      ) : (
-        <View style={styles.emptyState}>
-          <FileText size={48} color="#d1d5db" />
-          <Text style={styles.emptyText}>No invoices found</Text>
-        </View>
-      )}
-    </View>
-  );
-
-  // Add Parents Section
+  // Add Parents & Invites Section
   const renderParentsSection = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Parents & Guardians</Text>
-        <Text style={styles.sectionSubtitle}>
-          {child?.parents?.length || 0} parent(s) linked
-        </Text>
+        <View style={styles.sectionHeaderRow}>
+          <View>
+            <Text style={styles.sectionTitle}>Parents & Guardians</Text>
+            <Text style={styles.sectionSubtitle}>
+              {child?.parents?.length || 0} parent(s) linked • {invites.length} invitation(s)
+            </Text>
+          </View>
+          {child?.relationship === 'owner' && (
+            <Pressable 
+              style={styles.inviteButton}
+              onPress={handleInviteParent}
+            >
+              <UserPlus size={20} color="#ffffff" />
+              <Text style={styles.inviteButtonText}>Invite Parent</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
-      
+
+      {/* Active Parents */}
+      <Text style={styles.subsectionTitle}>Active Parents</Text>
       {child?.parents && child.parents.length > 0 ? (
         child.parents.map((parent) => (
           <View key={parent.id} style={styles.parentCard}>
@@ -608,15 +713,42 @@ export default function ChildDetailsScreen() {
               </Text>
             </View>
             <View style={styles.parentInfo}>
-              <Text style={styles.parentName}>
-                {parent.users?.first_name} {parent.users?.last_name}
-              </Text>
+              <View style={styles.parentHeader}>
+                <Text style={styles.parentName}>
+                  {parent.users?.first_name} {parent.users?.last_name}
+                </Text>
+                {parent.user_id === child.user_id && (
+                  <View style={styles.ownerBadge}>
+                    <Text style={styles.ownerBadgeText}>Primary</Text>
+                  </View>
+                )}
+              </View>
               <Text style={styles.parentRelationship}>
-                {parent.relationship} {parent.is_verified ? '• Verified' : '• Pending'}
+                {parent.relationship} • {parent.is_verified ? 'Verified' : 'Pending'}
               </Text>
               <Text style={styles.parentContact}>
-                {parent.users?.email} • {parent.users?.phone_number}
+                <Mail size={12} color="#94a3b8" /> {parent.users?.email}
               </Text>
+              <Text style={styles.parentContact}>
+                📱 {parent.users?.phone_number}
+              </Text>
+              <View style={styles.permissionsContainer}>
+                {parent.permissions?.edit && (
+                  <View style={styles.permissionBadge}>
+                    <Text style={styles.permissionText}>Edit</Text>
+                  </View>
+                )}
+                {parent.permissions?.view && (
+                  <View style={styles.permissionBadge}>
+                    <Text style={styles.permissionText}>View</Text>
+                  </View>
+                )}
+                {parent.permissions?.manage && (
+                  <View style={styles.permissionBadge}>
+                    <Text style={styles.permissionText}>Manage</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         ))
@@ -624,29 +756,89 @@ export default function ChildDetailsScreen() {
         <View style={styles.emptyState}>
           <Users size={48} color="#d1d5db" />
           <Text style={styles.emptyText}>No parents linked</Text>
-          <Text style={styles.emptySubtext}>
-            Share a code to invite other parents
-          </Text>
         </View>
       )}
-      
+
+      {/* Pending Invitations */}
+      {invites.length > 0 && (
+        <>
+          <Text style={[styles.subsectionTitle, { marginTop: 24 }]}>
+            Pending Invitations
+          </Text>
+          {invites
+            .filter(invite => invite.status === 'pending')
+            .map((invite) => (
+              <View key={invite.id} style={styles.inviteCard}>
+                <View style={styles.inviteHeader}>
+                  <View style={styles.inviteInfo}>
+                    <Mail size={16} color="#64748b" />
+                    <Text style={styles.inviteEmail}>{invite.invitee_email}</Text>
+                  </View>
+                  <View style={[
+                    styles.inviteStatusBadge,
+                    { backgroundColor: 
+                      invite.status === 'pending' ? '#fef3c7' :
+                      invite.status === 'accepted' ? '#d1fae5' :
+                      '#fee2e2'
+                    }
+                  ]}>
+                    <Text style={[
+                      styles.inviteStatusText,
+                      { color: 
+                        invite.status === 'pending' ? '#92400e' :
+                        invite.status === 'accepted' ? '#065f46' :
+                        '#991b1b'
+                      }
+                    ]}>
+                      {invite.status.charAt(0).toUpperCase() + invite.status.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.inviteDetails}>
+                  Invited as {invite.relationship} • Expires {new Date(invite.expires_at).toLocaleDateString()}
+                </Text>
+                {child?.relationship === 'owner' && invite.status === 'pending' && (
+                  <Pressable 
+                    style={styles.cancelInviteButton}
+                    onPress={() => handleCancelInvite(invite.id)}
+                  >
+                    <Text style={styles.cancelInviteText}>Cancel Invitation</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))}
+        </>
+      )}
+
       {/* Share Code Section */}
-      {child?.share_code && (
+      {child?.relationship === 'owner' && child?.share_code && (
         <View style={styles.shareCard}>
-          <Text style={styles.shareTitle}>Share Code</Text>
+          <View style={styles.shareHeader}>
+            <Share2 size={20} color="#0369a1" />
+            <Text style={styles.shareTitle}>Share Access</Text>
+          </View>
           <Text style={styles.shareCode}>{child.share_code}</Text>
           <Text style={styles.shareDescription}>
-            Share this code with other parents to link them to this child
+            Share this code with other parents to link them to {child.first_name}'s profile
           </Text>
-          <Pressable 
-            style={styles.copyButton}
-            onPress={() => {
-              Clipboard.setString(child.share_code);
-              Alert.alert('Copied', 'Share code copied to clipboard');
-            }}
-          >
-            <Text style={styles.copyButtonText}>Copy Code</Text>
-          </Pressable>
+          <View style={styles.shareButtons}>
+            <Pressable 
+              style={[styles.shareButton, styles.copyButton]}
+              onPress={() => {
+                Clipboard.setString(child.share_code);
+                Alert.alert('Copied', 'Share code copied to clipboard');
+              }}
+            >
+              <Text style={styles.shareButtonText}>Copy Code</Text>
+            </Pressable>
+            <Pressable 
+              style={styles.shareButton}
+              onPress={handleShareCode}
+            >
+              <Share2 size={16} color="#ffffff" />
+              <Text style={styles.shareButtonText}>Share</Text>
+            </Pressable>
+          </View>
         </View>
       )}
     </View>
@@ -703,17 +895,31 @@ export default function ChildDetailsScreen() {
                 style={styles.heroAvatar}
               />
             ) : (
-              <View style={styles.heroAvatar}>
+              <View style={[styles.heroAvatar, { backgroundColor: child.relationship === 'owner' ? '#8b5cf6' : '#06b6d4' }]}>
                 <Text style={styles.heroAvatarText}>
                   {child.first_name.charAt(0)}{child.last_name.charAt(0)}
                 </Text>
+                {child.relationship !== 'owner' && (
+                  <View style={styles.sharedAvatarBadge}>
+                    <Users size={12} color="#ffffff" />
+                  </View>
+                )}
               </View>
             )}
           </View>
           <View style={styles.heroInfo}>
-            <Text style={styles.heroName}>
-              {child.first_name} {child.last_name}
-            </Text>
+            <View style={styles.nameContainer}>
+              <Text style={styles.heroName}>
+                {child.first_name} {child.last_name}
+              </Text>
+              {child.relationship !== 'owner' && (
+                <View style={styles.relationshipBadge}>
+                  <Text style={styles.relationshipText}>
+                    {child.relationship === 'parent' ? 'Shared' : child.relationship}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.heroAge}>
               {calculateAge(child.date_of_birth)} years old • {child.gender}
             </Text>
@@ -734,11 +940,57 @@ export default function ChildDetailsScreen() {
             <Text style={styles.heroStatLabel}>Applications</Text>
           </View>
           <View style={styles.heroStat}>
-            <Text style={styles.heroStatNumber}>{getAttendancePercentage()}%</Text>
-            <Text style={styles.heroStatLabel}>Attendance</Text>
+            <Text style={styles.heroStatNumber}>{child.parents?.length || 0}</Text>
+            <Text style={styles.heroStatLabel}>Parents</Text>
           </View>
         </View>
       </View>
+
+      {/* Quick Actions */}
+      {child.relationship === 'owner' && (
+        <View style={styles.quickActions}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsGrid}>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push(`/children/${id}/edit`)}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#8b5cf6' }]}>
+                <ExternalLink size={24} color="#ffffff" />
+              </View>
+              <Text style={styles.actionText}>Edit Profile</Text>
+            </Pressable>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={handleInviteParent}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#06b6d4' }]}>
+                <UserPlus size={24} color="#ffffff" />
+              </View>
+              <Text style={styles.actionText}>Invite Parent</Text>
+            </Pressable>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push(`/apply/${child.id}`)}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#10b981' }]}>
+                <School size={24} color="#ffffff" />
+              </View>
+              <Text style={styles.actionText}>Apply to Creche</Text>
+            </Pressable>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={handleShareCode}
+              disabled={!child.share_code}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: child.share_code ? '#f59e0b' : '#d1d5db' }]}>
+                <Share2 size={24} color="#ffffff" />
+              </View>
+              <Text style={styles.actionText}>Share Access</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* Current Registration Info */}
       {child.creche && (
@@ -830,10 +1082,10 @@ export default function ChildDetailsScreen() {
         </View>
         <View style={[styles.statCard, { backgroundColor: '#f59e0b' }]}>
           <View style={styles.statIconContainer}>
-            <BookOpen size={20} color="#ffffff" />
+            <Users size={20} color="#ffffff" />
           </View>
-          <Text style={styles.statNumber}>{applicationNotes.length}</Text>
-          <Text style={styles.statLabel}>Notes</Text>
+          <Text style={styles.statNumber}>{child.parents?.length || 0}</Text>
+          <Text style={styles.statLabel}>Parents</Text>
         </View>
       </View>
 
@@ -1225,6 +1477,91 @@ export default function ChildDetailsScreen() {
     </View>
   );
 
+  const renderFinanceSection = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Finance</Text>
+        <Text style={styles.sectionSubtitle}>
+          {invoices.length} invoice(s) • {formatCurrency(invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0))} total
+        </Text>
+      </View>
+      
+      {invoices.length > 0 ? (
+        <>
+          {/* Summary Stats */}
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
+              <Text style={styles.statNumber}>
+                {formatCurrency(invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.total_amount || 0), 0))}
+              </Text>
+              <Text style={styles.statLabel}>Paid</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#f59e0b' }]}>
+              <Text style={styles.statNumber}>
+                {formatCurrency(invoices.filter(inv => inv.status === 'pending').reduce((sum, inv) => sum + (inv.total_amount || 0), 0))}
+              </Text>
+              <Text style={styles.statLabel}>Pending</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#ef4444' }]}>
+              <Text style={styles.statNumber}>
+                {formatCurrency(invoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + (inv.total_amount || 0), 0))}
+              </Text>
+              <Text style={styles.statLabel}>Overdue</Text>
+            </View>
+          </View>
+
+          {/* Invoices List */}
+          {invoices.map((invoice) => (
+            <Pressable 
+              key={invoice.id} 
+              style={styles.invoiceCard}
+              onPress={() => router.push(`/invoices/${invoice.id}`)}
+            >
+              <View style={styles.invoiceHeader}>
+                <Text style={styles.invoiceTitle}>{invoice.title}</Text>
+                <View style={[
+                  styles.invoiceStatusBadge,
+                  { backgroundColor: 
+                    invoice.status === 'paid' ? '#d1fae5' :
+                    invoice.status === 'pending' ? '#fef3c7' :
+                    '#fee2e2'
+                  }
+                ]}>
+                  <Text style={[
+                    styles.invoiceStatusText,
+                    { color: 
+                      invoice.status === 'paid' ? '#065f46' :
+                      invoice.status === 'pending' ? '#92400e' :
+                      '#991b1b'
+                    }
+                  ]}>
+                    {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.invoiceDate}>
+                {new Date(invoice.created_at).toLocaleDateString()}
+              </Text>
+              <Text style={styles.invoiceAmount}>
+                {formatCurrency(invoice.total_amount || 0)}
+              </Text>
+              {invoice.creches?.name && (
+                <Text style={styles.invoiceCreche}>
+                  {invoice.creches.name}
+                </Text>
+              )}
+            </Pressable>
+          ))}
+        </>
+      ) : (
+        <View style={styles.emptyState}>
+          <FileText size={48} color="#d1d5db" />
+          <Text style={styles.emptyText}>No invoices found</Text>
+        </View>
+      )}
+    </View>
+  );
+
   const renderNotesSection = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -1263,7 +1600,7 @@ export default function ChildDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with Share Button */}
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#ffffff" />
@@ -1271,7 +1608,16 @@ export default function ChildDetailsScreen() {
         <Text style={styles.headerTitle}>
           {child.first_name}'s Dashboard
         </Text>
-        <View style={styles.placeholder} />
+        {child.relationship === 'owner' ? (
+          <Pressable 
+            style={styles.shareHeaderButton}
+            onPress={handleInviteParent}
+          >
+            <UserPlus size={20} color="#ffffff" />
+          </Pressable>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       {/* Navigation Tabs */}
@@ -1332,18 +1678,14 @@ export default function ChildDetailsScreen() {
 }
 
 // Add these new styles to your existing styles object:
-  
-  // Keep all your existing styles below...
 const styles = StyleSheet.create({
   container: {
-  
     backgroundColor: '#f8fafc',
   },
-    content: {
-    flex: 1,
+  content: {
   },
-    contentContainer: {
-    flex: 1,
+  contentContainer: {
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',
@@ -1362,6 +1704,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  shareHeaderButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -1369,92 +1719,6 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
-  },
-
-    invoiceCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  invoiceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  invoiceTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 1,
-  },
-  invoiceStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  invoiceStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  invoiceDate: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  invoiceAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  invoiceCreche: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  tabsContainer: {
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  tabs: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-  },
-  activeTab: {
-    backgroundColor: '#8b5cf6',
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#ffffff',
-  },
-  content: {
   },
   loadingContainer: {
     flex: 1,
@@ -1493,6 +1757,11 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 20,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   sectionTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -1503,12 +1772,280 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#64748b',
   },
-  applicationsSubtitle: {
+  subsectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#374151',
     marginBottom: 12,
+  },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  inviteButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  parentCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  parentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  parentAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#8b5cf6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  parentAvatarText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  parentInfo: {
+    flex: 1,
+  },
+  parentName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  ownerBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  ownerBadgeText: {
+    fontSize: 10,
+    color: '#92400e',
+    fontWeight: '600',
+  },
+  parentRelationship: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  parentContact: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  permissionsContainer: {
+    flexDirection: 'row',
+    gap: 4,
     marginTop: 8,
+  },
+  permissionBadge: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  permissionText: {
+    fontSize: 10,
+    color: '#3730a3',
+    fontWeight: '600',
+  },
+  inviteCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inviteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  inviteInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inviteEmail: {
+    fontSize: 16,
+    color: '#1e293b',
+    fontWeight: '500',
+  },
+  inviteStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  inviteStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  inviteDetails: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+  cancelInviteButton: {
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  cancelInviteText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontWeight: '600',
+  },
+  shareCard: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  shareHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  shareTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0369a1',
+  },
+  shareCode: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#0c4a6e',
+    marginBottom: 12,
+    letterSpacing: 2,
+  },
+  shareDescription: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  shareButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  shareButton: {
+    flex: 1,
+    backgroundColor: '#0ea5e9',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  copyButton: {
+    backgroundColor: '#8b5cf6',
+  },
+  shareButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  relationshipBadge: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  relationshipText: {
+    fontSize: 12,
+    color: '#3730a3',
+    fontWeight: '600',
+  },
+  sharedAvatarBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#06b6d4',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  tabsContainer: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+  },
+  activeTab: {
+    backgroundColor: '#8b5cf6',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#ffffff',
   },
   // Hero Section
   heroCard: {
@@ -1529,6 +2066,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: 16,
+    position: 'relative',
   },
   heroAvatar: {
     width: 80,
@@ -1537,6 +2075,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8b5cf6',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   heroAvatarText: {
     color: '#ffffff',
@@ -1598,6 +2137,32 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textTransform: 'uppercase',
     fontWeight: '600',
+  },
+  quickActions: {
+    marginBottom: 20,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  actionButton: {
+    alignItems: 'center',
+    width: (screenWidth - 64) / 2,
+  },
+  actionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   // Current Creche Card
   currentCrecheCard: {
@@ -1702,91 +2267,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
   },
-
-  // Add to your styles
-parentCard: {
-  backgroundColor: '#ffffff',
-  borderRadius: 16,
-  padding: 16,
-  marginBottom: 12,
-  flexDirection: 'row',
-  alignItems: 'center',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 8,
-  elevation: 3,
-},
-parentAvatar: {
-  width: 50,
-  height: 50,
-  borderRadius: 25,
-  backgroundColor: '#8b5cf6',
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginRight: 16,
-},
-parentAvatarText: {
-  color: '#ffffff',
-  fontSize: 18,
-  fontWeight: 'bold',
-},
-parentInfo: {
-  flex: 1,
-},
-parentName: {
-  fontSize: 16,
-  fontWeight: 'bold',
-  color: '#1e293b',
-  marginBottom: 4,
-},
-parentRelationship: {
-  fontSize: 14,
-  color: '#64748b',
-  marginBottom: 2,
-},
-parentContact: {
-  fontSize: 12,
-  color: '#94a3b8',
-},
-shareCard: {
-  backgroundColor: '#f0f9ff',
-  borderRadius: 16,
-  padding: 20,
-  marginTop: 20,
-  alignItems: 'center',
-},
-shareTitle: {
-  fontSize: 16,
-  fontWeight: 'bold',
-  color: '#0369a1',
-  marginBottom: 8,
-},
-shareCode: {
-  fontSize: 24,
-  fontWeight: 'bold',
-  color: '#0c4a6e',
-  marginBottom: 12,
-  letterSpacing: 2,
-},
-shareDescription: {
-  fontSize: 14,
-  color: '#64748b',
-  textAlign: 'center',
-  marginBottom: 16,
-  lineHeight: 20,
-},
-copyButton: {
-  backgroundColor: '#0ea5e9',
-  paddingHorizontal: 20,
-  paddingVertical: 10,
-  borderRadius: 8,
-},
-copyButtonText: {
-  color: '#ffffff',
-  fontSize: 14,
-  fontWeight: '600',
-},
   statCard: {
     flex: 1,
     minWidth: (screenWidth - 52) / 2,
@@ -1894,34 +2374,13 @@ copyButtonText: {
     marginLeft: 8,
     flex: 1,
   },
-  // Quick Actions
-  quickActions: {
-    marginBottom: 20,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionButton: {
-    alignItems: 'center',
-    width: (screenWidth - 64) / 2,
-  },
-  actionIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    color: '#374151',
+  applicationsSubtitle: {
+    fontSize: 18,
     fontWeight: '600',
-    textAlign: 'center',
+    color: '#374151',
+    marginBottom: 12,
+    marginTop: 8,
   },
-  // Application Cards
   applicationCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -2226,6 +2685,54 @@ copyButtonText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Finance
+  invoiceCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  invoiceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  invoiceTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    flex: 1,
+  },
+  invoiceStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  invoiceStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  invoiceDate: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  invoiceAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  invoiceCreche: {
+    fontSize: 14,
+    color: '#6b7280',
   },
   bottomPadding: {
     height: 40,
