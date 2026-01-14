@@ -19,9 +19,9 @@ import {
   Users,
   MessageCircle,
   CreditCard,
-  X,
   Filter,
-  MoreVertical
+  MoreVertical,
+  User
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -31,12 +31,40 @@ interface Notification {
   type: 'application' | 'payment' | 'system' | 'reminder' | 'message' | 'announcement' | 'attendance';
   title: string;
   message: string;
-  is_read: boolean;
+  read_at: string | null; // Changed from is_read boolean
   created_at: string;
   metadata?: any;
   action_url?: string;
   user_id: string;
+  sender_id?: string;
+  deleted?: boolean;
 }
+
+// Helper function to determine notification type based on content
+const determineNotificationType = (notification: any): Notification['type'] => {
+  const title = notification.title?.toLowerCase() || '';
+  const message = notification.message?.toLowerCase() || '';
+
+  if (title.includes('application') || message.includes('application')) {
+    return 'application';
+  }
+  if (title.includes('payment') || message.includes('payment')) {
+    return 'payment';
+  }
+  if (title.includes('reminder') || message.includes('reminder')) {
+    return 'reminder';
+  }
+  if (title.includes('message') || message.includes('message')) {
+    return 'message';
+  }
+  if (title.includes('announcement') || message.includes('announcement')) {
+    return 'announcement';
+  }
+  if (title.includes('attendance') || message.includes('attendance')) {
+    return 'attendance';
+  }
+  return 'system';
+};
 
 // Skeleton Loading Component
 const NotificationSkeleton = () => {
@@ -149,6 +177,7 @@ const NotificationItem = ({
     });
   };
 
+  const isRead = !!notification.read_at;
   const notificationColor = getNotificationColor(notification.type);
 
   return (
@@ -156,7 +185,7 @@ const NotificationItem = ({
       <Pressable 
         style={[
           styles.notificationContent,
-          !notification.is_read && styles.unreadNotification
+          !isRead && styles.unreadNotification
         ]}
         onPress={onPress}
       >
@@ -178,7 +207,7 @@ const NotificationItem = ({
           </Text>
         </View>
 
-        {!notification.is_read && (
+        {!isRead && (
           <View style={[styles.unreadBadge, { backgroundColor: notificationColor }]} />
         )}
       </Pressable>
@@ -237,146 +266,36 @@ export default function NotificationsScreen() {
     try {
       setLoading(true);
       
-      // First, check if we have a notifications table
+      // Fetch notifications from your notifications table
       const { data: notificationsData, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select(`
+          *,
+          sender:users!sender_id(first_name, last_name)
+        `)
         .eq('user_id', user.id)
+        .eq('deleted', false)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) {
-        // If notifications table doesn't exist, check for other notification sources
-        await fetchNotificationsFromOtherSources();
+        console.error('Error fetching notifications:', error);
+        // If no notifications found, show empty state
+        setNotifications([]);
       } else {
-        // Process notifications from the notifications table
+        // Process notifications and determine their types
         const processedNotifications = (notificationsData || []).map(notification => ({
           ...notification,
-          type: notification.type as Notification['type']
+          type: determineNotificationType(notification)
         }));
         setNotifications(processedNotifications);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotifications([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  };
-
-  const fetchNotificationsFromOtherSources = async () => {
-    if (!user) return;
-    
-    const allNotifications: Notification[] = [];
-
-    try {
-      // 1. Check for application status updates
-      const { data: applications } = await supabase
-        .from('applications')
-        .select('id, application_status, creches(name)')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-        .limit(10);
-
-      if (applications) {
-        applications.forEach(app => {
-          if (app.application_status) {
-            allNotifications.push({
-              id: `app-${app.id}`,
-              type: 'application',
-              title: 'Application Update',
-              message: `Your application for ${app.creches?.name || 'a creche'} has been ${app.application_status}.`,
-              is_read: false,
-              created_at: new Date().toISOString(),
-              metadata: { application_id: app.id },
-              action_url: `/applications/${app.id}`,
-              user_id: user.id
-            });
-          }
-        });
-      }
-
-      // 2. Check for messages
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('id, content, sender_id, conversation_id')
-        .eq('recipient_id', user.id)
-        .eq('is_read', false)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (messages && messages.length > 0) {
-        allNotifications.push({
-          id: `messages-${Date.now()}`,
-          type: 'message',
-          title: 'New Messages',
-          message: `You have ${messages.length} unread message${messages.length > 1 ? 's' : ''}.`,
-          is_read: false,
-          created_at: messages[0].created_at,
-          action_url: '/messages',
-          user_id: user.id
-        });
-      }
-
-      // 3. Check for child-related updates (if you have child_parents table)
-      if (user.user_type === 'parent') {
-        const { data: children } = await supabase
-          .from('child_parents')
-          .select('children(first_name, last_name)')
-          .eq('user_id', user.id);
-
-        if (children && children.length > 0) {
-          children.forEach((child: any, index: number) => {
-            if (index < 3) { // Limit to 3 child notifications
-              allNotifications.push({
-                id: `child-${index}`,
-                type: 'announcement',
-                title: 'Child Profile Created',
-                message: `Your child ${child.children?.first_name} has been added to your profile.`,
-                is_read: true,
-                created_at: new Date().toISOString(),
-                user_id: user.id
-              });
-            }
-          });
-        }
-      }
-
-      // 4. Check for creche announcements (if user is creche owner)
-      if (user.user_type === 'creche_owner') {
-        const { data: creche } = await supabase
-          .from('creches')
-          .select('id, name')
-          .eq('owner_id', user.id)
-          .single();
-
-        if (creche) {
-          allNotifications.push({
-            id: `creche-welcome-${creche.id}`,
-            type: 'system',
-            title: 'Welcome to CrecheSpots!',
-            message: `Your creche "${creche.name}" is now set up. Start adding articles and managing your creche.`,
-            is_read: true,
-            created_at: new Date().toISOString(),
-            user_id: user.id
-          });
-        }
-      }
-
-      // 5. System notifications
-      allNotifications.push({
-        id: 'system-welcome',
-        type: 'system',
-        title: 'Welcome to CrecheSpots!',
-        message: 'Thank you for joining CrecheSpots. We\'re here to help you find the perfect creche for your child.',
-        is_read: true,
-        created_at: user.created_at || new Date().toISOString(),
-        user_id: user.id
-      });
-
-      setNotifications(allNotifications);
-    } catch (error) {
-      console.error('Error fetching notifications from other sources:', error);
     }
   };
 
@@ -389,23 +308,26 @@ export default function NotificationsScreen() {
     if (!user) return;
     
     try {
-      // First update local state
+      // Update in database first
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', notificationId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        return;
+      }
+
+      // Then update local state
       setNotifications(prev =>
         prev.map(notif =>
-          notif.id === notificationId ? { ...notif, is_read: true } : notif
+          notif.id === notificationId 
+            ? { ...notif, read_at: new Date().toISOString() } 
+            : notif
         )
       );
-
-      // Try to update in database if notifications table exists
-      if (!notificationId.startsWith('app-') && !notificationId.startsWith('messages-') && 
-          !notificationId.startsWith('child-') && !notificationId.startsWith('creche-') && 
-          notificationId !== 'system-welcome') {
-        await supabase
-          .from('notifications')
-          .update({ is_read: true })
-          .eq('id', notificationId)
-          .eq('user_id', user.id);
-      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -415,21 +337,22 @@ export default function NotificationsScreen() {
     if (!user) return;
     
     try {
+      // Soft delete by marking as deleted
+      const { error } = await supabase
+        .from('notifications')
+        .update({ deleted: true })
+        .eq('id', notificationId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error dismissing notification:', error);
+        return;
+      }
+
       // Remove from local state
       setNotifications(prev =>
         prev.filter(notif => notif.id !== notificationId)
       );
-
-      // Try to delete from database if notifications table exists
-      if (!notificationId.startsWith('app-') && !notificationId.startsWith('messages-') && 
-          !notificationId.startsWith('child-') && !notificationId.startsWith('creche-') && 
-          notificationId !== 'system-welcome') {
-        await supabase
-          .from('notifications')
-          .delete()
-          .eq('id', notificationId)
-          .eq('user_id', user.id);
-      }
     } catch (error) {
       console.error('Error dismissing notification:', error);
     }
@@ -439,32 +362,43 @@ export default function NotificationsScreen() {
     if (!user) return;
     
     try {
+      // Get all unread notification IDs
+      const unreadNotifications = notifications.filter(n => !n.read_at);
+      const notificationIds = unreadNotifications.map(n => n.id);
+
+      if (notificationIds.length === 0) return;
+
+      // Update all unread notifications in database
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .in('id', notificationIds)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error marking all as read:', error);
+        return;
+      }
+
       // Update local state
       setNotifications(prev =>
-        prev.map(notif => ({ ...notif, is_read: true }))
+        prev.map(notif => 
+          !notif.read_at 
+            ? { ...notif, read_at: new Date().toISOString() } 
+            : notif
+        )
       );
-
-      // Update in database if notifications table exists
-      const notificationIds = notifications
-        .filter(n => !n.is_read)
-        .map(n => n.id)
-        .filter(id => !id.startsWith('app-') && !id.startsWith('messages-') && 
-          !id.startsWith('child-') && !id.startsWith('creche-') && id !== 'system-welcome');
-
-      if (notificationIds.length > 0) {
-        await supabase
-          .from('notifications')
-          .update({ is_read: true })
-          .in('id', notificationIds)
-          .eq('user_id', user.id);
-      }
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
   };
 
   const handleNotificationPress = (notification: Notification) => {
-    markAsRead(notification.id);
+    // Only mark as read if it's not already read
+    if (!notification.read_at) {
+      markAsRead(notification.id);
+    }
+    
     if (notification.action_url) {
       router.push(notification.action_url as any);
     }
@@ -472,12 +406,12 @@ export default function NotificationsScreen() {
 
   const filteredNotifications = notifications.filter(notification => {
     if (filter === 'unread') {
-      return !notification.is_read;
+      return !notification.read_at;
     }
     return true;
   });
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !n.read_at).length;
 
   if (loading) {
     return <NotificationSkeleton />;
@@ -592,6 +526,12 @@ export default function NotificationsScreen() {
                 : 'You don\'t have any notifications at the moment.'
               }
             </Text>
+            <Pressable 
+              style={styles.retryButton}
+              onPress={fetchNotifications}
+            >
+              <Text style={styles.retryButtonText}>Refresh</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -847,6 +787,18 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  retryButton: {
+    marginTop: 24,
+    backgroundColor: '#8b5cf6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   // Skeleton Styles
   skeletonNotification: {

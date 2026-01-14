@@ -17,7 +17,7 @@ export default function Header({ child, onBack, onInviteParent }: HeaderProps) {
         <ArrowLeft size={24} color="#ffffff" />
       </Pressable>
       <Text style={headerStyles.headerTitle}>
-        {child.first_name}'s Dashboard
+        {child.first_name}'s <Profile></Profile>
       </Text>
       {child.relationship === 'owner' ? (
         <Pressable 
