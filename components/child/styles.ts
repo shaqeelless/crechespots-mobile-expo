@@ -110,6 +110,7 @@ export const tabsStyles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
+    flexGrow: 0, // Prevent tabs from shrinking
     shadowRadius: 3,
     elevation: 3,
     height: 60,
