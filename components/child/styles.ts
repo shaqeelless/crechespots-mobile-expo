@@ -112,12 +112,14 @@ export const tabsStyles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+    height: 60,
   },
   tabs: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 12,
     gap: 8,
+    flexWrap: 'nowrap', // Ensure tabs don't wrap
   },
   tab: {
     flexDirection: 'row',
@@ -127,6 +129,7 @@ export const tabsStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#f1f5f9',
+    flexShrink: 0, // Prevent tabs from shrinking
   },
   activeTab: {
     backgroundColor: '#8b5cf6',

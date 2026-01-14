@@ -30,7 +30,12 @@ export default function TabsNavigation({ activeSection, onSectionChange }: TabsN
   ];
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tabsStyles.tabsContainer}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false} 
+      style={tabsStyles.tabsContainer}
+      contentContainerStyle={{ flexGrow: 0}} // Add this
+    >
       <View style={tabsStyles.tabs}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;

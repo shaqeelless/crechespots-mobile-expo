@@ -10,14 +10,14 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Search, MapPin, Star, Filter, SlidersHorizontal, X, Heart, Bookmark } from 'lucide-react-native';
+import { Search, MapPin, Star, Filter, SlidersHorizontal, X, Heart, Bookmark, ArrowLeft } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 
 const { width } = Dimensions.get('window');
 
-// Skeleton Loading Component
+// Skeleton Loading Component (unchanged)
 const SkeletonLoader = () => {
   return (
     <View style={styles.skeletonContainer}>
@@ -250,6 +250,10 @@ export default function SearchScreen() {
     setSearchQuery('');
   };
 
+  const handleGoBack = () => {
+    router.back();
+  };
+
   const renderSearchResult = (result: any) => {
     const isFavorite = favorites.has(result.id);
     const isFavoriteLoading = favoritesLoading.has(result.id);
@@ -362,10 +366,15 @@ export default function SearchScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        {/* Header */}
+        {/* Header with Back Button */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Find Childcare</Text>
-          <Text style={styles.headerSubtitle}>Discover trusted creches near you</Text>
+          <Pressable style={styles.backButton} onPress={handleGoBack}>
+            <ArrowLeft size={24} color="#374151" />
+          </Pressable>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Find Childcare</Text>
+            <Text style={styles.headerSubtitle}>Discover trusted creches near you</Text>
+          </View>
         </View>
         <SkeletonLoader />
       </View>
@@ -386,10 +395,15 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with Back Button */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Find Childcare</Text>
-        <Text style={styles.headerSubtitle}>Discover trusted creches near you</Text>
+        <Pressable style={styles.backButton} onPress={handleGoBack}>
+          <ArrowLeft size={24} color="#374151" />
+        </Pressable>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Find Childcare</Text>
+          <Text style={styles.headerSubtitle}>Discover trusted creches near you</Text>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -520,10 +534,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 24,
     backgroundColor: '#ffffff',
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 4,
+  },
+  headerContent: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
@@ -851,7 +874,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  // Skeleton Loading Styles (keep existing skeleton styles)
+  // Skeleton Loading Styles (unchanged)
   skeletonContainer: {
     flex: 1,
     backgroundColor: '#f4fcfe',
