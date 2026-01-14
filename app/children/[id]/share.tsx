@@ -64,6 +64,46 @@ interface LinkedParent {
   };
 }
 
+// Skeleton Loading Components
+const SkeletonCard = () => (
+  <View style={skeletonStyles.skeletonCard}>
+    <View style={skeletonStyles.skeletonLine} />
+    <View style={[skeletonStyles.skeletonLine, { width: '60%' }]} />
+    <View style={[skeletonStyles.skeletonLine, { width: '40%', marginTop: 8 }]} />
+  </View>
+);
+
+const SkeletonInviteCard = () => (
+  <View style={skeletonStyles.skeletonInviteCard}>
+    <View style={skeletonStyles.skeletonAvatar} />
+    <View style={skeletonStyles.skeletonInviteContent}>
+      <View style={skeletonStyles.skeletonLine} />
+      <View style={[skeletonStyles.skeletonLine, { width: '50%' }]} />
+    </View>
+    <View style={skeletonStyles.skeletonButton} />
+  </View>
+);
+
+const SkeletonParentCard = () => (
+  <View style={skeletonStyles.skeletonParentCard}>
+    <View style={skeletonStyles.skeletonAvatar} />
+    <View style={skeletonStyles.skeletonParentContent}>
+      <View style={skeletonStyles.skeletonLine} />
+      <View style={[skeletonStyles.skeletonLine, { width: '70%' }]} />
+      <View style={[skeletonStyles.skeletonLine, { width: '40%', marginTop: 4 }]} />
+    </View>
+    <View style={skeletonStyles.skeletonIcon} />
+  </View>
+);
+
+const SkeletonSection = () => (
+  <View style={skeletonStyles.skeletonSection}>
+    <View style={skeletonStyles.skeletonTitle} />
+    <View style={[skeletonStyles.skeletonTitle, { width: '80%' }]} />
+    <SkeletonCard />
+  </View>
+);
+
 export default function ChildShareScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -291,22 +331,46 @@ export default function ChildShareScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#000000" />
-          </Pressable>
-          <Text style={styles.headerTitle}>Share Child</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+  // Render skeleton loading state
+  const renderSkeletonLoading = () => (
+    <View style={styles.container}>
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+        <View style={[styles.backButton, skeletonStyles.skeleton]} />
+        <View style={[skeletonStyles.skeletonTitle, { width: 150, height: 24 }]} />
+        <View style={[styles.placeholder, skeletonStyles.skeleton]} />
       </View>
-    );
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Quick Share Section Skeleton */}
+        <SkeletonSection />
+        
+        {/* Email Invite Section Skeleton */}
+        <SkeletonSection />
+        
+        {/* Pending Invitations Section Skeleton */}
+        <View style={skeletonStyles.skeletonSection}>
+          <View style={skeletonStyles.skeletonTitle} />
+          <View style={[skeletonStyles.skeletonTitle, { width: '60%' }]} />
+          {[1, 2].map((i) => (
+            <SkeletonInviteCard key={i} />
+          ))}
+        </View>
+        
+        {/* Linked Parents Section Skeleton */}
+        <View style={skeletonStyles.skeletonSection}>
+          <View style={skeletonStyles.skeletonTitle} />
+          <View style={[skeletonStyles.skeletonTitle, { width: '50%' }]} />
+          {[1, 2, 3].map((i) => (
+            <SkeletonParentCard key={i} />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  if (loading) {
+    return renderSkeletonLoading();
   }
 
   return (
@@ -888,5 +952,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+});
+
+// Skeleton loading styles
+const skeletonStyles = StyleSheet.create({
+  skeleton: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+  },
+  skeletonCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  skeletonInviteCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  skeletonParentCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  skeletonAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e2e8f0',
+    marginRight: 12,
+  },
+  skeletonInviteContent: {
+    flex: 1,
+  },
+  skeletonParentContent: {
+    flex: 1,
+  },
+  skeletonLine: {
+    height: 12,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    marginBottom: 6,
+    width: '100%',
+  },
+  skeletonButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e2e8f0',
+  },
+  skeletonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#e2e8f0',
+  },
+  skeletonSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  skeletonTitle: {
+    height: 20,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '100%',
   },
 });
