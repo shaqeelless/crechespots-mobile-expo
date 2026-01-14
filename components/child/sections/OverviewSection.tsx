@@ -176,25 +176,7 @@ export default function OverviewSection({
               </View>
               <Text style={overviewStyles.actionText}>Invite Parent</Text>
             </Pressable>
-            <Pressable 
-              style={overviewStyles.actionButton}
-              onPress={() => router.push(`/apply/${child.id}`)}
-            >
-              <View style={[overviewStyles.actionIcon, { backgroundColor: '#10b981' }]}>
-                <School size={24} color="#ffffff" />
-              </View>
-              <Text style={overviewStyles.actionText}>Apply to Creche</Text>
-            </Pressable>
-            <Pressable 
-              style={overviewStyles.actionButton}
-              onPress={() => {/* Handle share code */}}
-              disabled={!child.share_code}
-            >
-              <View style={[overviewStyles.actionIcon, { backgroundColor: child.share_code ? '#f59e0b' : '#d1d5db' }]}>
-                <Share2 size={24} color="#ffffff" />
-              </View>
-              <Text style={overviewStyles.actionText}>Share Access</Text>
-            </Pressable>
+
           </View>
         </View>
       )}

@@ -104,15 +104,6 @@ export default function ParentsSection({
               {child.parents?.length || 0} parent(s) linked • {invites.length} invitation(s)
             </Text>
           </View>
-          {child.relationship === 'owner' && (
-            <Pressable 
-              style={parentsStyles.inviteButton}
-              onPress={() => router.push(`/children/${id}/share`)}
-            >
-              <UserPlus size={20} color="#ffffff" />
-              <Text style={parentsStyles.inviteButtonText}>Invite Parent</Text>
-            </Pressable>
-          )}
         </View>
       </View>
 
