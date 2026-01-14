@@ -9,8 +9,6 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  TouchableOpacity,
-  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -20,18 +18,10 @@ import {
   X,
   User,
   Calendar,
-  MapPin,
+  Trash2,
   Heart,
   AlertCircle,
-  Phone,
-  Mail,
   FileText,
-  Upload,
-  CheckCircle,
-  Shield,
-  Pill,
-  Plus,
-  Trash2,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
@@ -97,14 +87,16 @@ export default function EditChildScreen() {
   const fetchChildData = async () => {
     try {
       setLoading(true);
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error('User not authenticated');
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
       const { data: childData, error } = await supabase
         .from('children')
         .select('*')
         .eq('id', id)
-        .eq('user_id', currentUser.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
@@ -164,8 +156,10 @@ export default function EditChildScreen() {
 
     try {
       setSaving(true);
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error('User not authenticated');
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
       const updateData = {
         first_name: firstName.trim(),
@@ -187,7 +181,7 @@ export default function EditChildScreen() {
         .from('children')
         .update(updateData)
         .eq('id', id)
-        .eq('user_id', currentUser.id);
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
@@ -216,13 +210,14 @@ export default function EditChildScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images, // Fixed: Changed from MediaTypeOptions
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: false, // Don't include base64 to avoid URI too long errors
       });
 
-      if (!result.canceled && result.assets[0].uri) {
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
         await uploadImage(result.assets[0].uri);
       }
     } catch (error) {
@@ -235,12 +230,20 @@ export default function EditChildScreen() {
     try {
       setUploadingImage(true);
 
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error('User not authenticated');
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
-      // Extract file extension
-      const fileExt = uri.split('.').pop();
-      const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
+      // Extract file extension from URI
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      
+      if (!validExtensions.includes(fileExt)) {
+        throw new Error('Invalid image format. Please use JPG, PNG, or GIF.');
+      }
+
+      // Generate unique filename
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
       const filePath = `child-profiles/${fileName}`;
 
       // Convert image to blob
@@ -248,37 +251,43 @@ export default function EditChildScreen() {
       const blob = await response.blob();
 
       // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data } = await supabase.storage
         .from('child_images')
         .upload(filePath, blob, {
           contentType: `image/${fileExt}`,
+          upsert: true,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        throw uploadError;
+      }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      // Get public URL - use the correct method
+      const { data: { publicUrl } } = supabase.storage
         .from('child_images')
         .getPublicUrl(filePath);
 
       // Update child profile with new image URL
       const { error: updateError } = await supabase
         .from('children')
-        .update({ profile_picture_url: urlData.publicUrl })
+        .update({ profile_picture_url: publicUrl })
         .eq('id', id)
-        .eq('user_id', currentUser.id);
+        .eq('user_id', user.id);
 
       if (updateError) throw updateError;
 
       // Update local state
-      setProfilePicture(urlData.publicUrl);
-      setChild(prev => prev ? { ...prev, profile_picture_url: urlData.publicUrl } : null);
+      setProfilePicture(publicUrl);
+      if (child) {
+        setChild({ ...child, profile_picture_url: publicUrl });
+      }
 
       Alert.alert('Success', 'Profile picture updated successfully');
 
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image');
+      Alert.alert('Error', error.message || 'Failed to upload image. Please try again.');
     } finally {
       setUploadingImage(false);
     }
@@ -295,19 +304,20 @@ export default function EditChildScreen() {
             text: 'Remove',
             style: 'destructive',
             onPress: async () => {
-              const { data: { user: currentUser } } = await supabase.auth.getUser();
-              if (!currentUser) return;
+              if (!user) return;
 
               const { error } = await supabase
                 .from('children')
                 .update({ profile_picture_url: null })
                 .eq('id', id)
-                .eq('user_id', currentUser.id);
+                .eq('user_id', user.id);
 
               if (error) throw error;
 
               setProfilePicture('');
-              setChild(prev => prev ? { ...prev, profile_picture_url: '' } : null);
+              if (child) {
+                setChild({ ...child, profile_picture_url: '' });
+              }
               Alert.alert('Success', 'Profile picture removed');
             },
           },
@@ -438,7 +448,7 @@ export default function EditChildScreen() {
                   </Text>
                 </Pressable>
                 
-                {profilePicture && (
+                {profilePicture ? (
                   <Pressable 
                     style={[styles.profilePictureButton, styles.removeButton]}
                     onPress={removeImage}
@@ -446,7 +456,7 @@ export default function EditChildScreen() {
                     <Trash2 size={20} color="#ffffff" />
                     <Text style={styles.profilePictureButtonText}>Remove</Text>
                   </Pressable>
-                )}
+                ) : null}
               </View>
             </View>
             
@@ -471,9 +481,9 @@ export default function EditChildScreen() {
               }}
               placeholder="Enter first name"
             />
-            {errors.firstName && (
+            {errors.firstName ? (
               <Text style={styles.errorText}>{errors.firstName}</Text>
-            )}
+            ) : null}
           </View>
 
           <View style={styles.formGroup}>
@@ -487,9 +497,9 @@ export default function EditChildScreen() {
               }}
               placeholder="Enter last name"
             />
-            {errors.lastName && (
+            {errors.lastName ? (
               <Text style={styles.errorText}>{errors.lastName}</Text>
-            )}
+            ) : null}
           </View>
 
           <View style={styles.formGroup}>
@@ -506,42 +516,25 @@ export default function EditChildScreen() {
             <Text style={styles.ageText}>
               {calculateAge(dateOfBirth)} years old
             </Text>
-            {errors.dateOfBirth && (
+            {errors.dateOfBirth ? (
               <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
-            )}
+            ) : null}
             
-            {showDatePicker && (
-              <Modal
-                transparent={true}
-                animationType="slide"
-                visible={showDatePicker}
-                onRequestClose={() => setShowDatePicker(false)}
-              >
-                <View style={styles.modalOverlay}>
-                  <View style={styles.modalContent}>
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Select Date of Birth</Text>
-                      <Pressable onPress={() => setShowDatePicker(false)}>
-                        <X size={24} color="#64748b" />
-                      </Pressable>
-                    </View>
-                    <DateTimePicker
-                      value={dateOfBirth}
-                      mode="date"
-                      display="spinner"
-                      maximumDate={new Date()}
-                      onChange={(event, selectedDate) => {
-                        setShowDatePicker(false);
-                        if (selectedDate) {
-                          setDateOfBirth(selectedDate);
-                          if (errors.dateOfBirth) setErrors({...errors, dateOfBirth: ''});
-                        }
-                      }}
-                    />
-                  </View>
-                </View>
-              </Modal>
-            )}
+            {showDatePicker ? (
+              <DateTimePicker
+                value={dateOfBirth}
+                mode="date"
+                display="spinner"
+                maximumDate={new Date()}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    setDateOfBirth(selectedDate);
+                    if (errors.dateOfBirth) setErrors({...errors, dateOfBirth: ''});
+                  }
+                }}
+              />
+            ) : null}
           </View>
 
           <View style={styles.formGroup}>
@@ -668,9 +661,9 @@ export default function EditChildScreen() {
               placeholder="Phone number (e.g., 0712345678)"
               keyboardType="phone-pad"
             />
-            {errors.emergencyContactPhone && (
+            {errors.emergencyContactPhone ? (
               <Text style={styles.errorText}>{errors.emergencyContactPhone}</Text>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -934,28 +927,6 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
-    color: '#1e293b',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
     color: '#1e293b',
   },
   actionSection: {

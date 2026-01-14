@@ -18,7 +18,11 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import SideMenu from '@/components/SideMenu';
-import { getCurrentLocation } from '@/utils/locationService';
+import { 
+  getCurrentLocation, 
+  getCrechesWithinRadius,
+  calculateDistance 
+} from '@/utils/locationService';
 
 // Import components
 import HomeHeader from '@/components/home/HomeHeader';
@@ -27,7 +31,6 @@ import QuickActions from '@/components/home/QuickActions';
 import NearbyCreches from '@/components/home/NearbyCreches';
 import ApplicationStatus from '@/components/home/ApplicationStatus';
 import BottomSpaces from '@/components/home/BottomSpaces';
-import ScrollDownIndicator from '@/components/home/ScrollDownIndicator';
 import LocationModal from '@/components/home/LocationModal';
 
 const { width, height } = Dimensions.get('window');
@@ -39,12 +42,15 @@ interface Creche {
   suburb: string;
   city: string;
   province: string;
+  latitude: number;
+  longitude: number;
   monthly_price: number;
   weekly_price: number;
   price: number;
   capacity: number;
   registered: boolean;
   applications: boolean;
+  distance?: number;
 }
 
 export default function HomeScreen() {
@@ -69,33 +75,36 @@ export default function HomeScreen() {
     suburb: profile?.suburb || '',
     city: profile?.city || '',
     province: profile?.province || '',
-    latitude: null as number | null,
-    longitude: null as number | null,
+    latitude: profile?.latitude || null,
+    longitude: profile?.longitude || null,
     display_name: '',
   });
 
-  // Get user's current location using Nominatim API
   const getCurrentLocationData = async () => {
     try {
       setLocationLoading(true);
       const locationData = await getCurrentLocation();
       
       if (locationData) {
-        setCurrentLocation({
+        const newLocation = {
           suburb: locationData.suburb,
           city: locationData.city,
           province: locationData.province,
           latitude: locationData.latitude,
           longitude: locationData.longitude,
           display_name: locationData.display_name,
-        });
+        };
 
-        // Update profile with location data
+        setCurrentLocation(newLocation);
+
+        // Update profile with location data including coordinates
         if (profile?.id) {
           await updateProfile({
             suburb: locationData.suburb,
             city: locationData.city,
             province: locationData.province,
+            latitude: locationData.latitude,
+            longitude: locationData.longitude,
           });
         }
       }
@@ -112,7 +121,6 @@ export default function HomeScreen() {
   useEffect(() => {
     initializeApp();
     
-    // Header entrance animation
     headerScale.value = withSpring(1, {
       damping: 15,
       stiffness: 120,
@@ -121,7 +129,7 @@ export default function HomeScreen() {
   }, []);
 
   const initializeApp = async () => {
-    // First try to get current location automatically
+    // Try to get current location automatically
     const locationData = await getCurrentLocationData();
     
     // If location failed but we have profile location, use that
@@ -130,13 +138,13 @@ export default function HomeScreen() {
         suburb: profile.suburb || '',
         city: profile.city || '',
         province: profile.province || '',
-        latitude: null,
-        longitude: null,
+        latitude: profile.latitude || null,
+        longitude: profile.longitude || null,
         display_name: '',
       });
     }
     
-    // Then fetch creches
+    // Fetch creches
     fetchNearbyCreches();
   };
 
@@ -155,93 +163,197 @@ export default function HomeScreen() {
     contentHeight.value = height;
   };
 
-const fetchNearbyCreches = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    console.log('Current location for filtering:', currentLocation);
-    
-    let query = supabase.from('creches').select('*');
-    
-    // Use the correct columns from your database: suburb and province
-    if (currentLocation.suburb && currentLocation.suburb !== 'Current Location') {
-      query = query.ilike('suburb', `%${currentLocation.suburb}%`);
-      console.log('Filtering by suburb:', currentLocation.suburb);
-    } else if (currentLocation.province) {
-      query = query.ilike('province', `%${currentLocation.province}%`);
-      console.log('Filtering by province:', currentLocation.province);
-    }
-    
-    const { data, error } = await query
-      .order('name')
-      .limit(10);
-
-    if (error) {
-      console.error('Supabase error:', error);
-      throw error;
-    }
-    
-    console.log('Fetched creches:', data?.length);
-    setCreches(data || []);
-    
-    // If no creches found, show appropriate message
-    if (data?.length === 0) {
-      if (currentLocation.suburb || currentLocation.province) {
-        setError(`No creches found in ${currentLocation.suburb || currentLocation.province}. Try a different location.`);
-      } else {
-        setError('No creches found. Please try again.');
+  // MAIN FUNCTION: Fetch creches using coordinates
+  const fetchNearbyCreches = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📍 === FETCHING CRECHES ===');
+      console.log('Current location:', {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        suburb: currentLocation.suburb,
+        city: currentLocation.city,
+        display_name: currentLocation.display_name
+      });
+      
+      // STRATEGY 1: Use coordinates for radius-based search
+      if (currentLocation.latitude && currentLocation.longitude) {
+        console.log('📍 Strategy 1: Using coordinates for radius search');
+        
+        // Get creches within 15km radius
+        const crechesInRadius = await getCrechesWithinRadius(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          15 // 15km radius
+        );
+        
+        if (crechesInRadius.length > 0) {
+          console.log(`✅ Found ${crechesInRadius.length} creches nearby`);
+          setCreches(crechesInRadius);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+        
+        // If no creches in 15km, try larger radius
+        console.log('📍 No creches in 15km, trying 30km radius');
+        const crechesInLargerRadius = await getCrechesWithinRadius(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          30 // 30km radius
+        );
+        
+        if (crechesInLargerRadius.length > 0) {
+          console.log(`✅ Found ${crechesInLargerRadius.length} creches within 30km`);
+          setCreches(crechesInLargerRadius);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+        
+        // If still no creches, fall back to text filtering
+        console.log('📍 No creches found with radius search, falling back to text filtering');
       }
+      
+      // STRATEGY 2: Text-based filtering (fallback)
+      console.log('📍 Strategy 2: Text-based filtering');
+      
+      let query = supabase.from('creches').select('*');
+      let filterApplied = false;
+      let filterType = '';
+      
+      if (currentLocation.suburb && currentLocation.suburb.trim() !== '') {
+        console.log(`🔍 Filtering by suburb: "${currentLocation.suburb}"`);
+        query = query.ilike('suburb', `%${currentLocation.suburb}%`);
+        filterApplied = true;
+        filterType = 'suburb';
+      } else if (currentLocation.city && currentLocation.city.trim() !== '') {
+        console.log(`🔍 Filtering by city: "${currentLocation.city}"`);
+        query = query.ilike('city', `%${currentLocation.city}%`);
+        filterApplied = true;
+        filterType = 'city';
+      } else if (currentLocation.province && currentLocation.province.trim() !== '') {
+        console.log(`🔍 Filtering by province: "${currentLocation.province}"`);
+        query = query.ilike('province', `%${currentLocation.province}%`);
+        filterApplied = true;
+        filterType = 'province';
+      }
+      
+      if (!filterApplied) {
+        console.log('⚠️ No location filter applied');
+        setError('Please select a location to find nearby creches');
+        setCreches([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      
+      const { data, error } = await query
+        .order('name')
+        .limit(20);
+
+      if (error) throw error;
+      
+      console.log(`✅ Found ${data?.length || 0} creches with ${filterType} filter`);
+      
+      // Calculate distances if we have user coordinates
+      let crechesWithDistance = data || [];
+      if (currentLocation.latitude && currentLocation.longitude) {
+        crechesWithDistance = crechesWithDistance.map(creche => {
+          if (creche.latitude && creche.longitude) {
+            const distance = calculateDistance(
+              currentLocation.latitude,
+              currentLocation.longitude,
+              creche.latitude,
+              creche.longitude
+            );
+            return { ...creche, distance: Math.round(distance * 10) / 10 };
+          }
+          return creche;
+        });
+        
+        // Sort by distance
+        crechesWithDistance.sort((a, b) => {
+          if (a.distance === undefined && b.distance === undefined) return 0;
+          if (a.distance === undefined) return 1;
+          if (b.distance === undefined) return -1;
+          return a.distance - b.distance;
+        });
+      }
+      
+      setCreches(crechesWithDistance);
+      
+      if (crechesWithDistance.length === 0) {
+        const locationName = currentLocation.suburb || currentLocation.city || currentLocation.province;
+        setError(`No creches found in ${locationName}. Try a different location or expand search radius.`);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching creches:', error);
+      setError('Failed to load creches. Please pull down to refresh.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  } catch (error) {
-    console.error('Error fetching creches:', error);
-    setError('Failed to load creches. Please pull down to refresh.');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchNearbyCreches();
   };
 
-const handleLocationSelect = async (location: any) => {
-  try {
-    console.log('Selected location:', location);
-    
-    // Use suburb as the primary filter since that's what your database has
-    const locationData = {
-      suburb: location.suburb || location.name || '',
-      city: location.city || location.name || '', // Keep city for display purposes
-      province: location.province || '',
-      latitude: location.latitude || null,
-      longitude: location.longitude || null,
-      display_name: location.display_name || '',
-    };
-
-    console.log('Processed location data:', locationData);
-
-    setCurrentLocation(locationData);
-
-    // Update profile with location data
-    if (profile?.id) {
-      await updateProfile({
-        suburb: locationData.suburb,
-        city: locationData.city,
-        province: locationData.province,
+  const handleLocationSelect = async (location: any) => {
+    try {
+      console.log('📍 Selected location:', {
+        name: location.name,
+        suburb: location.suburb,
+        city: location.city,
+        province: location.province,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        display_name: location.display_name
       });
-    }
+      
+      // Ensure we have valid coordinates
+      if (!location.latitude || !location.longitude) {
+        Alert.alert('Location Error', 'Selected location has no coordinates. Please try a different location.');
+        return;
+      }
+      
+      const locationData = {
+        suburb: location.suburb || location.name || '',
+        city: location.city || location.name || '',
+        province: location.province || '',
+        latitude: location.latitude,
+        longitude: location.longitude,
+        display_name: location.display_name || `${location.suburb || location.name}, ${location.city}`,
+      };
 
-    // Refresh creches for new location
-    fetchNearbyCreches();
-  } catch (error) {
-    console.error('Error updating location:', error);
-    Alert.alert('Error', 'Failed to update location. Please try again.');
-  }
-};
+      console.log('📌 Setting location data:', locationData);
+      setCurrentLocation(locationData);
+
+      // Update profile with coordinates
+      if (profile?.id) {
+        await updateProfile({
+          suburb: locationData.suburb,
+          city: locationData.city,
+          province: locationData.province,
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+        });
+      }
+
+      // Fetch creches for new location
+      fetchNearbyCreches();
+    } catch (error) {
+      console.error('❌ Error updating location:', error);
+      Alert.alert('Error', 'Failed to update location. Please try again.');
+    }
+  };
 
   const handleUseCurrentLocation = async () => {
+    console.log('📍 Using current location...');
     await getCurrentLocationData();
     fetchNearbyCreches();
   };
@@ -300,10 +412,9 @@ const handleLocationSelect = async (location: any) => {
           </>
         )}
 
-        {/* Extra Bottom Padding for better scroll feel */}
+        {/* Extra Bottom Padding */}
         <View style={styles.extraBottomPadding} />
       </Animated.ScrollView>
-
 
       <SideMenu visible={sideMenuVisible} onClose={() => setSideMenuVisible(false)} />
 

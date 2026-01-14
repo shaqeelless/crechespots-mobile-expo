@@ -41,12 +41,11 @@ export default function NotFoundScreen() {
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <Link href="/" style={styles.primaryButton}>
-            <Home size={20} color="#ffffff" />
+
             <Text style={styles.primaryButtonText}>Go to Home</Text>
           </Link>
           
           <Link href="/search" style={styles.secondaryButton}>
-            <Search size={20} color="#3a5dc4" />
             <Text style={styles.secondaryButtonText}>Find Creches</Text>
           </Link>
         </View>

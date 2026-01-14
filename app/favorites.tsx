@@ -9,7 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { Heart, Star, MapPin } from 'lucide-react-native';
+import { Heart, Star, MapPin, ArrowLeft, MoreVertical } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
@@ -47,48 +47,48 @@ export default function FavoritesScreen() {
     }
   }, [user]);
 
-const fetchFavorites = async () => {
-  try {
-    setLoading(true);
-    
-    // First get the favorite IDs
-    const { data: favoritesData, error: favoritesError } = await supabase
-      .from('user_favorites')
-      .select('id, creche_id, created_at')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false });
-
-    if (favoritesError) throw favoritesError;
-
-    if (favoritesData && favoritesData.length > 0) {
-      // Then get the creche details for each favorite
-      const crecheIds = favoritesData.map(fav => fav.creche_id);
+  const fetchFavorites = async () => {
+    try {
+      setLoading(true);
       
-      const { data: crechesData, error: crechesError } = await supabase
-        .from('creches')
-        .select('*')
-        .in('id', crecheIds);
+      // First get the favorite IDs
+      const { data: favoritesData, error: favoritesError } = await supabase
+        .from('user_favorites')
+        .select('id, creche_id, created_at')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
 
-      if (crechesError) throw crechesError;
+      if (favoritesError) throw favoritesError;
 
-      // Combine the data
-      const combinedData = favoritesData.map(fav => ({
-        ...fav,
-        creches: crechesData?.find(c => c.id === fav.creche_id) || null
-      }));
+      if (favoritesData && favoritesData.length > 0) {
+        // Then get the creche details for each favorite
+        const crecheIds = favoritesData.map(fav => fav.creche_id);
+        
+        const { data: crechesData, error: crechesError } = await supabase
+          .from('creches')
+          .select('*')
+          .in('id', crecheIds);
 
-      setFavorites(combinedData);
-    } else {
-      setFavorites([]);
+        if (crechesError) throw crechesError;
+
+        // Combine the data
+        const combinedData = favoritesData.map(fav => ({
+          ...fav,
+          creches: crechesData?.find(c => c.id === fav.creche_id) || null
+        }));
+
+        setFavorites(combinedData);
+      } else {
+        setFavorites([]);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    
-  } catch (error) {
-    console.error('Error fetching favorites:', error);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -142,8 +142,14 @@ const fetchFavorites = async () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Favorites</Text>
-          <Text style={styles.headerSubtitle}>Your saved childcare options</Text>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#374151" />
+          </Pressable>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>My Favorites</Text>
+            <Text style={styles.headerSubtitle}>Your saved childcare options</Text>
+          </View>
+          <View style={styles.headerPlaceholder} />
         </View>
         <View style={styles.emptyState}>
           <Heart size={64} color="#d1d5db" />
@@ -158,9 +164,16 @@ const fetchFavorites = async () => {
 
   return (
     <View style={styles.container}>
+      {/* Header with Back Button */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Favorites</Text>
-        <Text style={styles.headerSubtitle}>Your saved childcare options</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#374151" />
+        </Pressable>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>My Favorites</Text>
+          <Text style={styles.headerSubtitle}>Your saved childcare options</Text>
+        </View>
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -169,21 +182,24 @@ const fetchFavorites = async () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#2563eb']}
-            tintColor={'#2563eb'}
+            colors={['#8b5cf6']}
+            tintColor={'#8b5cf6'}
           />
         }
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2563eb" />
+            <ActivityIndicator size="large" color="#8b5cf6" />
             <Text style={styles.loadingText}>Loading your favorites...</Text>
           </View>
         ) : favorites.length > 0 ? (
           favorites.map((favorite) => (
             <Pressable
               key={favorite.id}
-              style={styles.favoriteCard}
+              style={({ pressed }) => [
+                styles.favoriteCard,
+                pressed && styles.favoriteCardPressed,
+              ]}
               onPress={() => router.push(`/search/${favorite.creche_id}`)}
             >
               <Image
@@ -201,9 +217,19 @@ const fetchFavorites = async () => {
 
               <View style={styles.favoriteContent}>
                 <View style={styles.favoriteHeader}>
-                  <Text style={styles.favoriteName}>{favorite.creches?.name}</Text>
+                  <View style={styles.nameContainer}>
+                    <Text style={styles.favoriteName}>{favorite.creches?.name}</Text>
+                    {favorite.creches?.capacity && (
+                      <Text style={styles.capacityBadge}>
+                        Capacity: {favorite.creches.capacity}
+                      </Text>
+                    )}
+                  </View>
                   <Pressable
-                    style={styles.heartButton}
+                    style={({ pressed }) => [
+                      styles.heartButton,
+                      pressed && styles.heartButtonPressed,
+                    ]}
                     onPress={(e) => {
                       e.stopPropagation();
                       removeFavorite(favorite.id);
@@ -238,20 +264,27 @@ const fetchFavorites = async () => {
                       ? `R${favorite.creches.price}/day`
                       : 'Contact for pricing'}
                   </Text>
-                  <Text style={styles.savedDate}>Saved {formatTimeAgo(favorite.created_at)}</Text>
+                  <Text style={styles.savedDate}>
+                    Saved {formatTimeAgo(favorite.created_at)}
+                  </Text>
                 </View>
               </View>
             </Pressable>
           ))
         ) : (
           <View style={styles.emptyState}>
-            <Heart size={64} color="#d1d5db" />
+            <View style={styles.emptyIllustration}>
+              <Heart size={64} color="#d1d5db" />
+            </View>
             <Text style={styles.emptyTitle}>No favorites yet</Text>
             <Text style={styles.emptyDescription}>
               Start exploring and save your favorite creches to see them here
             </Text>
             <Pressable
-              style={styles.exploreButton}
+              style={({ pressed }) => [
+                styles.exploreButton,
+                pressed && styles.exploreButtonPressed,
+              ]}
               onPress={() => router.push('/search')}
             >
               <Text style={styles.exploreButtonText}>Explore Creches</Text>
@@ -263,27 +296,46 @@ const fetchFavorites = async () => {
   );
 }
 
-// Your existing styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4fcfe',
+    backgroundColor: '#f8fafc',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 24,
     backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerContent: {
+    flex: 1,
+    marginLeft: 12,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: 14,
+    color: '#64748b',
+  },
+  headerPlaceholder: {
+    width: 40,
   },
   content: {
     flex: 1,
@@ -296,7 +348,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#64748b',
     marginTop: 12,
   },
   favoriteCard: {
@@ -306,28 +358,39 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  favoriteCardPressed: {
+    backgroundColor: '#fafafa',
+    transform: [{ scale: 0.99 }],
   },
   favoriteImage: {
     width: '100%',
-    height: 160,
-    backgroundColor: '#e5e7eb',
+    height: 180,
+    backgroundColor: '#e2e8f0',
   },
   verifiedBadge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#22c55e',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    top: 12,
+    left: 12,
+    backgroundColor: '#10b981',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   verifiedText: {
-    color: '#fff',
+    color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 12,
   },
@@ -337,14 +400,27 @@ const styles = StyleSheet.create({
   favoriteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  nameContainer: {
+    flex: 1,
+    marginRight: 8,
   },
   favoriteName: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    flex: 1,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  capacityBadge: {
+    fontSize: 12,
+    color: '#64748b',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
   },
   heartButton: {
     width: 36,
@@ -354,23 +430,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  heartButtonPressed: {
+    backgroundColor: '#fee2e2',
+  },
   favoriteInfo: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   rating: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1e293b',
     marginLeft: 4,
   },
   reviews: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#64748b',
     marginLeft: 4,
   },
   locationContainer: {
@@ -379,32 +458,47 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#64748b',
     marginLeft: 4,
   },
   favoriteFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
   price: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2563eb',
+    color: '#8b5cf6',
   },
   savedDate: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#94a3b8',
+    fontStyle: 'italic',
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
   },
+  emptyIllustration: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#f1f5f9',
+    borderStyle: 'dashed',
+  },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#374151',
-    marginTop: 16,
     marginBottom: 8,
   },
   emptyDescription: {
@@ -413,12 +507,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
+    paddingHorizontal: 20,
   },
   exploreButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#8b5cf6',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 8,
+  },
+  exploreButtonPressed: {
+    backgroundColor: '#7c3aed',
+    transform: [{ scale: 0.98 }],
   },
   exploreButtonText: {
     color: '#ffffff',

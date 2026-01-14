@@ -22,25 +22,55 @@ const NearbyCreches: React.FC<NearbyCrechesProps> = ({
   onRetry,
   onChangeLocation,
 }) => {
+  // Get location name for display
+  const getLocationName = () => {
+    if (currentLocation.suburb && currentLocation.suburb !== currentLocation.city) {
+      return `${currentLocation.suburb}, ${currentLocation.city}`;
+    }
+    return currentLocation.city || currentLocation.suburb || 'your area';
+  };
+
+  // Get search radius info
+  const getSearchInfo = () => {
+    if (currentLocation.latitude && currentLocation.longitude) {
+      const nearbyCount = creches.filter(c => c.distance && c.distance <= 15).length;
+      const totalCount = creches.length;
+      
+      if (nearbyCount > 0) {
+        return `Showing ${totalCount} creches (${nearbyCount} within 15km)`;
+      }
+      return 'Sorted by distance from your location';
+    }
+    return 'Accepting applications in your area';
+  };
+
   return (
     <Animated.View 
       style={styles.section}
       entering={FadeInUp.delay(1100).duration(800).springify()}
     >
       <Text style={styles.sectionTitle}>
-        {currentLocation.city ? `Nearby Creches in ${currentLocation.city}` : 'Nearby Creches'}
+        {currentLocation.city ? `Nearby Creches in ${getLocationName()}` : 'Nearby Creches'}
       </Text>
-      <Text style={styles.sectionSubtitle}>Accepting applications in your area</Text>
+      <Text style={styles.sectionSubtitle}>{getSearchInfo()}</Text>
       
       {error ? (
         <AnimatedView 
           style={styles.errorContainer}
           entering={BounceIn.duration(800)}
         >
+          <View style={styles.errorIcon}>
+            <Text style={styles.errorIconText}>📍</Text>
+          </View>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryButton} onPress={onRetry}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </Pressable>
+          <View style={styles.buttonContainer}>
+            <Pressable style={[styles.retryButton, styles.secondaryButton]} onPress={onChangeLocation}>
+              <Text style={styles.retryButtonText}>Change Location</Text>
+            </Pressable>
+            <Pressable style={styles.retryButton} onPress={onRetry}>
+              <Text style={styles.retryButtonText}>Retry Search</Text>
+            </Pressable>
+          </View>
         </AnimatedView>
       ) : creches.length > 0 ? (
         <ScrollView 
@@ -55,6 +85,7 @@ const NearbyCreches: React.FC<NearbyCrechesProps> = ({
                 creche={creche}
                 index={index}
                 onPress={() => router.push(`/search/${creche.id}`)}
+                distance={creche.distance}
               />
             ))}
           </View>
@@ -64,8 +95,16 @@ const NearbyCreches: React.FC<NearbyCrechesProps> = ({
           style={styles.emptyContainer}
           entering={BounceIn.duration(800)}
         >
-          <Text style={styles.emptyText}>No creches found in {currentLocation.city || 'your area'}</Text>
-          <Text style={styles.emptySubtext}>Try selecting a different location</Text>
+          <View style={styles.emptyIcon}>
+            <Text style={styles.emptyIconText}>🏫</Text>
+          </View>
+          <Text style={styles.emptyText}>No creches found in {getLocationName()}</Text>
+          <Text style={styles.emptySubtext}>
+            {currentLocation.latitude && currentLocation.longitude 
+              ? 'Try expanding your search radius or selecting a different location'
+              : 'Try selecting a different location'
+            }
+          </Text>
           <Pressable 
             style={styles.retryButton} 
             onPress={onChangeLocation}
@@ -107,10 +146,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 20,
   },
+  errorIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  errorIconText: {
+    fontSize: 28,
+  },
   errorText: {
     fontSize: 16,
     color: '#ef4444',
-    marginBottom: 12,
+    marginBottom: 20,
     textAlign: 'center',
   },
   emptyContainer: {
@@ -120,23 +171,45 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 20,
   },
+  emptyIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyIconText: {
+    fontSize: 28,
+  },
   emptyText: {
     fontSize: 16,
     color: '#6b7280',
     marginBottom: 8,
     textAlign: 'center',
+    fontWeight: '600',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#9ca3af',
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
   },
   retryButton: {
     backgroundColor: '#bd84f6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: '#e2e8f0',
   },
   retryButtonText: {
     color: '#ffffff',

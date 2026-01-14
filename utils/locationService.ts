@@ -1,7 +1,6 @@
-import * as Location from 'expo-location';
-import { Alert } from 'react-native';
-
-interface LocationResult {
+export interface LocationResult {
+  id?: string;
+  name?: string;
   suburb: string;
   city: string;
   province: string;
@@ -10,7 +9,7 @@ interface LocationResult {
   display_name: string;
 }
 
-interface NominatimResult {
+export interface NominatimResult {
   place_id: number;
   licence: string;
   osm_type: string;
@@ -37,9 +36,12 @@ interface NominatimResult {
   };
 }
 
+import * as Location from 'expo-location';
+import { Alert } from 'react-native';
+import { supabase } from '@/lib/supabase';
+
 export const getCurrentLocation = async (): Promise<LocationResult | null> => {
   try {
-    // Request permission
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
@@ -50,12 +52,10 @@ export const getCurrentLocation = async (): Promise<LocationResult | null> => {
       return null;
     }
 
-    // Get current position
     let location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
 
-    // Reverse geocode using Nominatim
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.coords.latitude}&lon=${location.coords.longitude}&zoom=18&addressdetails=1`,
       {
@@ -75,7 +75,6 @@ export const getCurrentLocation = async (): Promise<LocationResult | null> => {
     if (data && data.address) {
       const address = data.address;
       
-      // Extract location components with fallbacks
       const suburb = address.suburb || address.village || address.municipality || '';
       const city = address.city || address.town || address.municipality || address.county || '';
       const province = address.province || address.state || address.region || '';
@@ -102,14 +101,111 @@ export const getCurrentLocation = async (): Promise<LocationResult | null> => {
   }
 };
 
+// Calculate distance between two coordinates in kilometers
+export const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+// Get creches within a radius using client-side filtering
+export const getCrechesWithinRadius = async (
+  latitude: number,
+  longitude: number,
+  radiusKm: number = 10
+) => {
+  try {
+    console.log(`🔍 Fetching creches within ${radiusKm}km of (${latitude}, ${longitude})`);
+    
+    const { data: allCreches, error } = await supabase
+      .from('creches')
+      .select('*');
+    
+    if (error) throw error;
+    
+    if (!allCreches || allCreches.length === 0) {
+      console.log('No creches found in database');
+      return [];
+    }
+    
+    // Count creches with coordinates
+    const crechesWithCoords = allCreches.filter(c => c.latitude && c.longitude);
+    console.log(`${crechesWithCoords.length}/${allCreches.length} creches have coordinates`);
+    
+    const nearbyCreches = crechesWithCoords.filter(creche => {
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        creche.latitude,
+        creche.longitude
+      );
+      
+      // Add distance property to creche object
+      creche.distance = Math.round(distance * 10) / 10;
+      return distance <= radiusKm;
+    });
+    
+    console.log(`✅ Found ${nearbyCreches.length} creches within ${radiusKm}km radius`);
+    
+    // Sort by distance
+    return nearbyCreches.sort((a, b) => (a.distance || 999) - (b.distance || 999));
+  } catch (error) {
+    console.error('Error fetching creches within radius:', error);
+    return [];
+  }
+};
+
+// Database-side radius query (more efficient for large datasets)
+export const getCrechesWithinRadiusDB = async (
+  latitude: number,
+  longitude: number,
+  radiusKm: number = 10
+) => {
+  try {
+    console.log(`📍 Database query: Within ${radiusKm}km of (${latitude}, ${longitude})`);
+    
+    // Using PostGIS-like calculation in Supabase
+    const { data, error } = await supabase
+      .rpc('get_creches_within_radius', {
+        user_lat: latitude,
+        user_lon: longitude,
+        radius_km: radiusKm
+      });
+    
+    if (error) {
+      console.log('Falling back to client-side calculation');
+      return await getCrechesWithinRadius(latitude, longitude, radiusKm);
+    }
+    
+    console.log(`✅ Database returned ${data?.length || 0} creches`);
+    return data || [];
+  } catch (error) {
+    console.error('Error in database radius query:', error);
+    return await getCrechesWithinRadius(latitude, longitude, radiusKm);
+  }
+};
+
 export const searchLocations = async (query: string): Promise<LocationResult[]> => {
   try {
     if (!query.trim()) {
       return [];
     }
 
+    console.log(`🔍 Searching for location: "${query}"`);
+
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&bounded=1&viewbox=16.45,-22.13,32.89,-34.83&limit=5&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&bounded=1&viewbox=16.45,-22.13,32.89,-34.83&limit=10&addressdetails=1`,
       {
         headers: {
           'User-Agent': 'Uthutho/1.0 (shaqeel@crechespots.co.za)',
@@ -123,20 +219,46 @@ export const searchLocations = async (query: string): Promise<LocationResult[]> 
     }
 
     const data: NominatimResult[] = await response.json();
-
+    
+    console.log(`📍 Nominatim returned ${data.length} results for "${query}"`);
+    
     return data.map((item: NominatimResult, index: number) => {
-      // Prioritize suburb for filtering since that's what your database uses
-      const suburb = item.address.suburb || item.address.village || item.address.municipality || '';
-      const city = item.address.city || item.address.town || item.address.municipality || item.address.county || '';
+      const address = item.address;
+      const lat = parseFloat(item.lat);
+      const lon = parseFloat(item.lon);
       
+      // Enhanced address extraction
+      let suburb = '';
+      if (address.suburb) {
+        suburb = address.suburb;
+      } else if (address.village) {
+        suburb = address.village;
+      } else if (address.town && address.town !== address.city) {
+        suburb = address.town;
+      } else if (address.municipality) {
+        suburb = address.municipality;
+      }
+      
+      const city = address.city || address.town || address.municipality || address.county || '';
+      const province = address.province || address.state || address.region || '';
+      
+      // For townships, use display_name first part as suburb
+      const displayParts = item.display_name.split(',');
+      if (!suburb && displayParts.length > 0) {
+        const firstPart = displayParts[0].trim();
+        if (firstPart.toLowerCase().includes(query.toLowerCase())) {
+          suburb = firstPart;
+        }
+      }
+
       return {
-        id: `search-${index}`,
+        id: `search-${index}-${Date.now()}`,
         name: item.display_name.split(',')[0],
-        suburb: suburb || city, // Use city as fallback for suburb
+        suburb: suburb || city,
         city: city,
-        province: item.address.province || item.address.state || item.address.region || '',
-        latitude: parseFloat(item.lat),
-        longitude: parseFloat(item.lon),
+        province: province,
+        latitude: lat,
+        longitude: lon,
         display_name: item.display_name,
       };
     });
@@ -146,19 +268,17 @@ export const searchLocations = async (query: string): Promise<LocationResult[]> 
   }
 };
 
-// Get popular South African locations
-// Get popular South African locations
 export const getPopularLocations = (): LocationResult[] => {
   return [
     {
-      id: 'johannesburg',
-      name: 'Johannesburg',
-      suburb: 'Johannesburg Central',
-      city: 'Johannesburg',
-      province: 'Gauteng',
-      latitude: -26.2041,
-      longitude: 28.0473,
-      display_name: 'Johannesburg, Gauteng, South Africa',
+      id: 'lentegeur',
+      name: 'Lentegeur',
+      suburb: 'Lentegeur',
+      city: 'Cape Town',
+      province: 'Western Cape',
+      latitude: -34.0522,
+      longitude: 18.6700,
+      display_name: 'Lentegeur, Cape Town, Western Cape',
     },
     {
       id: 'cape-town',
@@ -168,7 +288,17 @@ export const getPopularLocations = (): LocationResult[] => {
       province: 'Western Cape',
       latitude: -33.9249,
       longitude: 18.4241,
-      display_name: 'Cape Town, Western Cape, South Africa',
+      display_name: 'Cape Town, Western Cape',
+    },
+    {
+      id: 'johannesburg',
+      name: 'Johannesburg',
+      suburb: 'Johannesburg Central',
+      city: 'Johannesburg',
+      province: 'Gauteng',
+      latitude: -26.2041,
+      longitude: 28.0473,
+      display_name: 'Johannesburg, Gauteng',
     },
     {
       id: 'durban',
@@ -178,27 +308,48 @@ export const getPopularLocations = (): LocationResult[] => {
       province: 'KwaZulu-Natal',
       latitude: -29.8587,
       longitude: 31.0218,
-      display_name: 'Durban, KwaZulu-Natal, South Africa',
+      display_name: 'Durban, KwaZulu-Natal',
     },
     {
-      id: 'pretoria',
-      name: 'Pretoria',
-      suburb: 'Pretoria Central',
-      city: 'Pretoria',
-      province: 'Gauteng',
-      latitude: -25.7479,
-      longitude: 28.2293,
-      display_name: 'Pretoria, Gauteng, South Africa',
-    },
-    {
-      id: 'soweto',
-      name: 'Soweto',
-      suburb: 'Soweto',
-      city: 'Johannesburg',
-      province: 'Gauteng',
-      latitude: -26.2485,
-      longitude: 27.8540,
-      display_name: 'Soweto, Gauteng, South Africa',
+      id: 'khayelitsha',
+      name: 'Khayelitsha',
+      suburb: 'Khayelitsha',
+      city: 'Cape Town',
+      province: 'Western Cape',
+      latitude: -34.0392,
+      longitude: 18.6735,
+      display_name: 'Khayelitsha, Cape Town, Western Cape',
     },
   ];
+};
+
+// Geocode a creche address
+export const geocodeCrecheAddress = async (address: string): Promise<{ latitude: number; longitude: number } | null> => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=za`,
+      {
+        headers: {
+          'User-Agent': 'Uthutho/1.0 (shaqeel@crechespots.co.za)',
+          'Accept': 'application/json',
+        },
+      }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    
+    if (data.length > 0) {
+      return {
+        latitude: parseFloat(data[0].lat),
+        longitude: parseFloat(data[0].lon)
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error geocoding address:', error);
+    return null;
+  }
 };
