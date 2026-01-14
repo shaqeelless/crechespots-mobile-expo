@@ -18,20 +18,20 @@ import {
   MedicalRecord,
   Invoice,
   ChildInvite
-} from '@/components/child/types';
-import Header from '@/components/child/components/Header';
-import TabsNavigation from '@/components/child/components/TabsNavigation';
-import LoadingState from '@/components/child/components/LoadingState';
-import ErrorState from '@/components/child/components/ErrorState';
-import OverviewSection from '@/components/child/sections/OverviewSection';
-import ApplicationsSection from '@/components/child/sections/ApplicationsSection';
-import EnrollmentSection from '@/components/child/sections/EnrollmentSection';
-import AttendanceSection from '@/components/child/sections/AttendanceSection';
-import MedicalSection from '@/components/child/sections/MedicalSection';
-import FinanceSection from '@/components/child/sections/FinanceSection';
-import ParentsSection from '@/components/child/sections/ParentsSection';
-import NotesSection from '@/components/child/sections/NotesSection';
-import { sharedStyles } from '@/components/child/styles';
+} from './types';
+import Header from './components/Header';
+import TabsNavigation from './components/TabsNavigation';
+import LoadingState from './components/LoadingState';
+import ErrorState from './components/ErrorState';
+import OverviewSection from './sections/OverviewSection';
+import ApplicationsSection from './sections/ApplicationsSection';
+import EnrollmentSection from './sections/EnrollmentSection';
+import AttendanceSection from './sections/AttendanceSection';
+import MedicalSection from './sections/MedicalSection';
+import FinanceSection from './sections/FinanceSection';
+import ParentsSection from './sections/ParentsSection';
+import NotesSection from './sections/NotesSection';
+import { sharedStyles } from './styles';
 
 export default function ChildDetailsScreen() {
   const router = useRouter();
