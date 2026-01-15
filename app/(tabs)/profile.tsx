@@ -157,125 +157,134 @@ export default function ProfileScreen() {
     }
   };
 
-  const uploadImage = async (uri: string) => {
-    try {
-      setUploading(true);
-      
-      // Check if profile exists and has an ID
-      if (!profile?.id) {
-        Alert.alert('Error', 'Profile not found. Please try logging out and back in.');
-        return;
-      }
-
-      console.log('Starting upload for user:', profile.id);
-
-      // Convert image to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      // Generate unique filename using user ID
-      const fileName = `${profile.id}_${Date.now()}.jpg`;
-      
-      console.log('Uploading file:', fileName);
-
-      // Try different buckets
-      let uploadSuccessful = false;
-      let publicUrl = '';
-      
-      // Try 'avatars' bucket first (common default)
-      try {
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            upsert: true,
-          });
-
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
-          
-          if (urlData?.publicUrl) {
-            publicUrl = urlData.publicUrl;
-            uploadSuccessful = true;
-            console.log('Uploaded to avatars bucket:', publicUrl);
-          }
-        }
-      } catch (avatarError) {
-        console.log('Avatars bucket failed, trying profile-pictures...');
-      }
-
-      // If avatars bucket failed, try profile-pictures
-      if (!uploadSuccessful) {
-        try {
-          const { error: uploadError } = await supabase.storage
-            .from('profile-pictures')
-            .upload(fileName, blob, {
-              contentType: 'image/jpeg',
-              upsert: true,
-            });
-
-          if (uploadError) {
-            console.error('Profile-pictures upload error:', uploadError);
-            throw new Error(`Storage upload failed: ${uploadError.message}`);
-          }
-
-          const { data: urlData } = supabase.storage
-            .from('profile-pictures')
-            .getPublicUrl(fileName);
-          
-          if (!urlData?.publicUrl) {
-            throw new Error('Failed to get public URL');
-          }
-          
-          publicUrl = urlData.publicUrl;
-          uploadSuccessful = true;
-          console.log('Uploaded to profile-pictures bucket:', publicUrl);
-        } catch (profilePicturesError) {
-          console.error('Both buckets failed:', profilePicturesError);
-          throw profilePicturesError;
-        }
-      }
-
-      // Update profile in database using upsert
-      console.log('Updating profile with URL:', publicUrl);
-      
-      const { error: upsertError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: profile.id,
-          profile_picture_url: publicUrl,
-          updated_at: new Date().toISOString(),
-          // Include existing profile data to prevent overwriting
-          first_name: profile.first_name || '',
-          last_name: profile.last_name || '',
-          email: profile.email || '',
-          created_at: profile.created_at || new Date().toISOString()
-        }, {
-          onConflict: 'id'
-        });
-
-      if (upsertError) {
-        console.error('Upsert error:', upsertError);
-        throw new Error(`Database update failed: ${upsertError.message}`);
-      }
-
-      console.log('Profile updated successfully');
-
-      // Refresh profile data
-      if (updateProfile) {
-        await updateProfile();
-      }
-
-      Alert.alert('Success', 'Profile picture updated successfully!');
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', `Failed to upload image: ${error.message || 'Please try again.'}`);
-    } finally {
-      setUploading(false);
+const uploadImage = async (uri: string) => {
+  try {
+    setUploading(true);
+    
+    if (!profile?.id) {
+      throw new Error('No user profile found');
     }
-  };
+
+    console.log('Step 1: Converting image to blob...');
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const fileName = `${profile.id}_${Date.now()}.jpg`;
+    
+    console.log('Step 2: Uploading to storage...');
+    const { error: uploadError, data: uploadData } = await supabase.storage
+      .from('profile-pictures')
+      .upload(fileName, blob, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Storage upload failed:', uploadError);
+      throw new Error(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    console.log('Step 3: Getting public URL...');
+    const { data: urlData } = supabase.storage
+      .from('profile-pictures')
+      .getPublicUrl(fileName);
+    
+    const publicUrl = urlData?.publicUrl;
+    if (!publicUrl) {
+      throw new Error('Failed to generate public URL');
+    }
+    
+    console.log('Public URL:', publicUrl);
+
+    console.log('Step 4: Updating database...');
+    // Try different approaches
+    let updateError = null;
+    let updateData = null;
+    
+    // Approach 1: Simple update without select
+    const { error: error1 } = await supabase
+      .from('users')
+      .update({
+        profile_picture_url: publicUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id);
+
+    updateError = error1;
+    
+    // If Approach 1 fails, try Approach 2: With select but different syntax
+    if (updateError) {
+      console.log('Approach 1 failed, trying Approach 2...');
+      const { data: data2, error: error2 } = await supabase
+        .from('users')
+        .update({
+          profile_picture_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', profile.id)
+        .select()
+        .single();
+      
+      updateError = error2;
+      updateData = data2;
+    }
+    
+    // If still failing, try Approach 3: Direct fetch
+    if (updateError) {
+      console.log('Approach 2 failed, trying direct fetch...');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const directResponse = await fetch(
+        `https://bqydopqekazcedqvpxzo.supabase.co/rest/v1/users?id=eq.${profile.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': 'your-anon-key', // Get from Supabase settings
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal' // Changed from return=representation
+          },
+          body: JSON.stringify({
+            profile_picture_url: publicUrl,
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+      
+      if (!directResponse.ok) {
+        const errorText = await directResponse.text();
+        throw new Error(`Direct update failed: ${directResponse.status} - ${errorText}`);
+      }
+      
+      console.log('Direct update succeeded');
+    } else {
+      console.log('Database update succeeded via Supabase client');
+    }
+
+    console.log('Step 5: Refreshing profile data...');
+    if (updateProfile) {
+      await updateProfile();
+    }
+
+    Alert.alert('Success', 'Profile picture updated successfully!');
+  } catch (error: any) {
+    console.error('Full upload error:', error);
+    
+    // More detailed error messages
+    let errorMessage = error.message || 'Failed to upload image';
+    
+    if (error.message?.includes('permission denied')) {
+      errorMessage = 'Permission denied. Please check your database permissions.';
+    } else if (error.message?.includes('violates row-level security')) {
+      errorMessage = 'Security policy violation. Contact support.';
+    } else if (error.message?.includes('400')) {
+      errorMessage = 'Bad request. The update format might be incorrect.';
+    }
+    
+    Alert.alert('Error', errorMessage);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [

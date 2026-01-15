@@ -555,15 +555,7 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
 
-          {/* Help Section */}
-          <View style={styles.helpSection}>
-            <Text style={styles.helpTitle}>Having trouble signing in?</Text>
-            <Text style={styles.helpText}>
-              • Check your password for typos{'\n'}
-              • Make sure CAPS LOCK is off{'\n'}
-              • Reset your password if needed
-            </Text>
-          </View>
+        
         </View>
       </ScrollView>
     </View>

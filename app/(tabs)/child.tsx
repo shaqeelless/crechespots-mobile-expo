@@ -214,13 +214,6 @@ const EnhancedChildCard = ({
             </Text>
           </View>
           
-          <Pressable 
-            style={[styles.editButton, !canEdit && styles.editButtonDisabled]}
-            onPress={onEdit}
-            disabled={!canEdit}
-          >
-            <Edit3 size={18} color={canEdit ? "#bd84f6" : "#d1d5db"} />
-          </Pressable>
         </Pressable>
       </View>
     </View>

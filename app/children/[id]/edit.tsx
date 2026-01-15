@@ -1,3 +1,4 @@
+// app/children/[id]/edit.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -23,11 +24,11 @@ import {
   AlertCircle,
   FileText,
 } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import { useChildImageUpload } from '@/hooks/useChildImageUpload';
 
 interface Child {
   id: string;
@@ -58,7 +59,6 @@ export default function EditChildScreen() {
   const [child, setChild] = useState<Child | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
   
   // Form state
   const [firstName, setFirstName] = useState('');
@@ -78,11 +78,53 @@ export default function EditChildScreen() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Initialize image upload hook
+  const { 
+    pickImage: pickProfileImage, 
+    removeImage: removeProfileImage, 
+    uploading: uploadingImage 
+  } = useChildImageUpload({
+    childId: id as string,
+    userId: user?.id || '',
+    onImageUpdated: async (imageUrl: string) => {
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      try {
+        // Update in database
+        const { error } = await supabase
+          .from('children')
+          .update({ 
+            profile_picture_url: imageUrl || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        // Update local state
+        setProfilePicture(imageUrl);
+        if (child) {
+          setChild({ ...child, profile_picture_url: imageUrl });
+        }
+
+        console.log('Profile picture updated successfully');
+      } catch (error: any) {
+        console.error('Error updating profile picture:', error);
+        Alert.alert('Error', 'Failed to update profile picture');
+        throw error;
+      }
+    }
+  });
+
   useEffect(() => {
-    if (id) {
+    if (id && user) {
       fetchChildData();
     }
-  }, [id]);
+  }, [id, user]);
 
   const fetchChildData = async () => {
     try {
@@ -200,135 +242,6 @@ export default function EditChildScreen() {
     }
   };
 
-  const pickImage = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'You need to grant camera roll permissions to upload images');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.Images, // Fixed: Changed from MediaTypeOptions
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        base64: false, // Don't include base64 to avoid URI too long errors
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  const uploadImage = async (uri: string) => {
-    try {
-      setUploadingImage(true);
-
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Extract file extension from URI
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-      
-      if (!validExtensions.includes(fileExt)) {
-        throw new Error('Invalid image format. Please use JPG, PNG, or GIF.');
-      }
-
-      // Generate unique filename
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `child-profiles/${fileName}`;
-
-      // Convert image to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      // Upload to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
-        .from('child_images')
-        .upload(filePath, blob, {
-          contentType: `image/${fileExt}`,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
-        throw uploadError;
-      }
-
-      // Get public URL - use the correct method
-      const { data: { publicUrl } } = supabase.storage
-        .from('child_images')
-        .getPublicUrl(filePath);
-
-      // Update child profile with new image URL
-      const { error: updateError } = await supabase
-        .from('children')
-        .update({ profile_picture_url: publicUrl })
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
-
-      // Update local state
-      setProfilePicture(publicUrl);
-      if (child) {
-        setChild({ ...child, profile_picture_url: publicUrl });
-      }
-
-      Alert.alert('Success', 'Profile picture updated successfully');
-
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image. Please try again.');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  const removeImage = async () => {
-    try {
-      Alert.alert(
-        'Remove Profile Picture',
-        'Are you sure you want to remove the profile picture?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Remove',
-            style: 'destructive',
-            onPress: async () => {
-              if (!user) return;
-
-              const { error } = await supabase
-                .from('children')
-                .update({ profile_picture_url: null })
-                .eq('id', id)
-                .eq('user_id', user.id);
-
-              if (error) throw error;
-
-              setProfilePicture('');
-              if (child) {
-                setChild({ ...child, profile_picture_url: '' });
-              }
-              Alert.alert('Success', 'Profile picture removed');
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error removing image:', error);
-      Alert.alert('Error', error.message || 'Failed to remove image');
-    }
-  };
-
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -425,7 +338,11 @@ export default function EditChildScreen() {
           <View style={styles.profilePictureContainer}>
             <View style={styles.profilePictureWrapper}>
               {profilePicture ? (
-                <Image source={{ uri: profilePicture }} style={styles.profilePicture} />
+                <Image 
+                  source={{ uri: profilePicture }} 
+                  style={styles.profilePicture} 
+                  resizeMode="cover"
+                />
               ) : (
                 <View style={[styles.profilePicture, styles.profilePicturePlaceholder]}>
                   <User size={40} color="#8b5cf6" />
@@ -435,7 +352,7 @@ export default function EditChildScreen() {
               <View style={styles.profilePictureActions}>
                 <Pressable 
                   style={[styles.profilePictureButton, styles.uploadButton]}
-                  onPress={pickImage}
+                  onPress={pickProfileImage}
                   disabled={uploadingImage}
                 >
                   {uploadingImage ? (
@@ -451,7 +368,8 @@ export default function EditChildScreen() {
                 {profilePicture ? (
                   <Pressable 
                     style={[styles.profilePictureButton, styles.removeButton]}
-                    onPress={removeImage}
+                    onPress={removeProfileImage}
+                    disabled={uploadingImage}
                   >
                     <Trash2 size={20} color="#ffffff" />
                     <Text style={styles.profilePictureButtonText}>Remove</Text>
@@ -461,7 +379,7 @@ export default function EditChildScreen() {
             </View>
             
             <Text style={styles.profilePictureHint}>
-              Upload a clear photo of the child. Recommended size: 500x500px
+              Upload a clear photo of the child. Max size: 5MB (JPEG, PNG, GIF, WebP)
             </Text>
           </View>
         </View>
@@ -696,7 +614,7 @@ export default function EditChildScreen() {
           <Pressable 
             style={[styles.actionButton, styles.saveActionButton]}
             onPress={handleSave}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           >
             {saving ? (
               <ActivityIndicator size="small" color="#ffffff" />
@@ -711,7 +629,7 @@ export default function EditChildScreen() {
           <Pressable 
             style={[styles.actionButton, styles.cancelButton]}
             onPress={() => router.back()}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           >
             <X size={20} color="#374151" />
             <Text style={[styles.actionButtonText, styles.cancelButtonText]}>

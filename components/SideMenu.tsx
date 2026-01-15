@@ -102,16 +102,6 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
               </Pressable>
             </View>
 
-            {/* User Info Section - Optional, add if you have user data */}
-            {/* <View style={styles.userInfo}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>JD</Text>
-              </View>
-              <View>
-                <Text style={styles.userName}>John Doe</Text>
-                <Text style={styles.userEmail}>john@example.com</Text>
-              </View>
-            </View> */}
 
             {/* Menu Items */}
             <View style={styles.menuItems}>
