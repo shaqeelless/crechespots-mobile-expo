@@ -632,19 +632,6 @@ export default function FeedsScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Your Feeds</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notificationButton} onPress={() => router.push('/notifications')}>
-              <Bell size={24} color="#374151" />
-              {unreadNotifications > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationCount}>{unreadNotifications}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addIconButton} onPress={() => setShowAddCreche(true)}>
-              <Plus size={24} color="#bd84f6" />
-            </TouchableOpacity>
-          </View>
         </View>
         <View style={styles.emptyState}>
           <BookOpen size={64} color="#d1d5db" />
@@ -665,11 +652,6 @@ export default function FeedsScreen() {
         <View>
           <Text style={styles.headerTitle}>Your Feeds</Text>
           <Text style={styles.headerSubtitle}>Updates from your favorite creches</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable style={styles.createButton} onPress={() => setShowCreateModal(true)}>
-            <Plus size={24} color="#ffffff" />
-          </Pressable>
         </View>
       </View>
 
