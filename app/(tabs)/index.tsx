@@ -128,25 +128,47 @@ export default function HomeScreen() {
     headerOpacity.value = withTiming(1, { duration: 800 });
   }, []);
 
-  const initializeApp = async () => {
-    // Try to get current location automatically
-    const locationData = await getCurrentLocationData();
+// In HomeScreen.tsx, update the initializeApp function:
+
+const initializeApp = async () => {
+  setLoading(true);
+  
+  try {
+    // First, check if we have cached location data
+    let locationData = null;
     
-    // If location failed but we have profile location, use that
-    if (!locationData && profile?.city) {
-      setCurrentLocation({
+    if (profile?.latitude && profile?.longitude) {
+      console.log('📍 Using cached profile location');
+      locationData = {
         suburb: profile.suburb || '',
         city: profile.city || '',
         province: profile.province || '',
-        latitude: profile.latitude || null,
-        longitude: profile.longitude || null,
+        latitude: profile.latitude,
+        longitude: profile.longitude,
         display_name: '',
-      });
+      };
+      setCurrentLocation(locationData);
     }
     
-    // Fetch creches
-    fetchNearbyCreches();
-  };
+    // Try to get current location in background
+    getCurrentLocationData().then(async (currentLocation) => {
+      if (currentLocation) {
+        console.log('📍 Got current location from GPS');
+        setCurrentLocation(currentLocation);
+      }
+      
+      // Always fetch creches after trying GPS
+      await fetchNearbyCreches();
+    }).catch(() => {
+      // If GPS fails, still fetch with existing location
+      fetchNearbyCreches();
+    });
+    
+  } catch (error) {
+    console.error('❌ Initialization error:', error);
+    setLoading(false);
+  }
+};
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -164,104 +186,36 @@ export default function HomeScreen() {
   };
 
   // MAIN FUNCTION: Fetch creches using coordinates
-  const fetchNearbyCreches = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+const fetchNearbyCreches = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    console.log('📍 === FETCHING CRECHES ===');
+    console.log('Current location:', {
+      latitude: currentLocation.latitude,
+      longitude: currentLocation.longitude,
+      suburb: currentLocation.suburb,
+      city: currentLocation.city,
+      display_name: currentLocation.display_name
+    });
+    
+    // STRATEGY 1: Use coordinates for distance calculation
+    if (currentLocation.latitude && currentLocation.longitude) {
+      console.log('📍 Strategy 1: Using coordinates for enhanced search');
       
-      console.log('📍 === FETCHING CRECHES ===');
-      console.log('Current location:', {
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        suburb: currentLocation.suburb,
-        city: currentLocation.city,
-        display_name: currentLocation.display_name
-      });
-      
-      // STRATEGY 1: Use coordinates for radius-based search
-      if (currentLocation.latitude && currentLocation.longitude) {
-        console.log('📍 Strategy 1: Using coordinates for radius search');
-        
-        // Get creches within 15km radius
-        const crechesInRadius = await getCrechesWithinRadius(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          15 // 15km radius
-        );
-        
-        if (crechesInRadius.length > 0) {
-          console.log(`✅ Found ${crechesInRadius.length} creches nearby`);
-          setCreches(crechesInRadius);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
-        
-        // If no creches in 15km, try larger radius
-        console.log('📍 No creches in 15km, trying 30km radius');
-        const crechesInLargerRadius = await getCrechesWithinRadius(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          30 // 30km radius
-        );
-        
-        if (crechesInLargerRadius.length > 0) {
-          console.log(`✅ Found ${crechesInLargerRadius.length} creches within 30km`);
-          setCreches(crechesInLargerRadius);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
-        
-        // If still no creches, fall back to text filtering
-        console.log('📍 No creches found with radius search, falling back to text filtering');
-      }
-      
-      // STRATEGY 2: Text-based filtering (fallback)
-      console.log('📍 Strategy 2: Text-based filtering');
-      
-      let query = supabase.from('creches').select('*');
-      let filterApplied = false;
-      let filterType = '';
-      
-      if (currentLocation.suburb && currentLocation.suburb.trim() !== '') {
-        console.log(`🔍 Filtering by suburb: "${currentLocation.suburb}"`);
-        query = query.ilike('suburb', `%${currentLocation.suburb}%`);
-        filterApplied = true;
-        filterType = 'suburb';
-      } else if (currentLocation.city && currentLocation.city.trim() !== '') {
-        console.log(`🔍 Filtering by city: "${currentLocation.city}"`);
-        query = query.ilike('city', `%${currentLocation.city}%`);
-        filterApplied = true;
-        filterType = 'city';
-      } else if (currentLocation.province && currentLocation.province.trim() !== '') {
-        console.log(`🔍 Filtering by province: "${currentLocation.province}"`);
-        query = query.ilike('province', `%${currentLocation.province}%`);
-        filterApplied = true;
-        filterType = 'province';
-      }
-      
-      if (!filterApplied) {
-        console.log('⚠️ No location filter applied');
-        setError('Please select a location to find nearby creches');
-        setCreches([]);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-      
-      const { data, error } = await query
+      // Fetch ALL creches first (no radius filter initially)
+      const { data, error } = await supabase
+        .from('creches')
+        .select('*')
         .order('name')
-        .limit(20);
-
+        .limit(50); // Increase limit to get more results
+        
       if (error) throw error;
       
-      console.log(`✅ Found ${data?.length || 0} creches with ${filterType} filter`);
-      
-      // Calculate distances if we have user coordinates
-      let crechesWithDistance = data || [];
-      if (currentLocation.latitude && currentLocation.longitude) {
-        crechesWithDistance = crechesWithDistance.map(creche => {
+      if (data && data.length > 0) {
+        // Calculate distances for all creches
+        const crechesWithDistance = data.map(creche => {
           if (creche.latitude && creche.longitude) {
             const distance = calculateDistance(
               currentLocation.latitude,
@@ -274,29 +228,142 @@ export default function HomeScreen() {
           return creche;
         });
         
-        // Sort by distance
+        // Sort by distance (closest first)
         crechesWithDistance.sort((a, b) => {
           if (a.distance === undefined && b.distance === undefined) return 0;
           if (a.distance === undefined) return 1;
           if (b.distance === undefined) return -1;
           return a.distance - b.distance;
         });
+        
+        // Take top 20 closest creches
+        const topCreches = crechesWithDistance.slice(0, 20);
+        
+        console.log(`✅ Found ${data.length} creches total, showing ${topCreches.length} closest`);
+        console.log('Distances:', topCreches.map(c => ({ 
+          name: c.name, 
+          distance: c.distance,
+          hasCoords: !!(c.latitude && c.longitude)
+        })));
+        
+        setCreches(topCreches);
+        setLoading(false);
+        setRefreshing(false);
+        return;
       }
+    }
+    
+    // STRATEGY 2: Text-based filtering (fallback)
+    console.log('📍 Strategy 2: Text-based filtering');
+    
+    let query = supabase.from('creches').select('*');
+    let filterApplied = false;
+    let filterType = '';
+    
+    // Try different location fields in order of specificity
+    if (currentLocation.suburb && currentLocation.suburb.trim() !== '') {
+      console.log(`🔍 Filtering by suburb: "${currentLocation.suburb}"`);
+      query = query.ilike('suburb', `%${currentLocation.suburb}%`);
+      filterApplied = true;
+      filterType = 'suburb';
+    } 
+    
+    if (!filterApplied && currentLocation.city && currentLocation.city.trim() !== '') {
+      console.log(`🔍 Filtering by city: "${currentLocation.city}"`);
+      query = query.ilike('city', `%${currentLocation.city}%`);
+      filterApplied = true;
+      filterType = 'city';
+    } 
+    
+    if (!filterApplied && currentLocation.province && currentLocation.province.trim() !== '') {
+      console.log(`🔍 Filtering by province: "${currentLocation.province}"`);
+      query = query.ilike('province', `%${currentLocation.province}%`);
+      filterApplied = true;
+      filterType = 'province';
+    }
+    
+    // If no location filter, show ALL creches from database (no filtering)
+    if (!filterApplied) {
+      console.log('⚠️ No location filter, showing all creches');
+      const { data, error } = await supabase
+        .from('creches')
+        .select('*')
+        .order('name')
+        .limit(20);
+        
+      if (error) throw error;
       
-      setCreches(crechesWithDistance);
-      
-      if (crechesWithDistance.length === 0) {
-        const locationName = currentLocation.suburb || currentLocation.city || currentLocation.province;
-        setError(`No creches found in ${locationName}. Try a different location or expand search radius.`);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching creches:', error);
-      setError('Failed to load creches. Please pull down to refresh.');
-    } finally {
+      console.log(`✅ Showing ${data?.length || 0} creches (all available)`);
+      setCreches(data || []);
       setLoading(false);
       setRefreshing(false);
+      return;
     }
-  };
+    
+    // Execute the filtered query
+    const { data, error } = await query
+      .order('name')
+      .limit(20);
+
+    if (error) throw error;
+    
+    console.log(`✅ Found ${data?.length || 0} creches with ${filterType} filter`);
+    
+    // Calculate distances if we have user coordinates
+    let crechesWithDistance = data || [];
+    if (currentLocation.latitude && currentLocation.longitude) {
+      crechesWithDistance = crechesWithDistance.map(creche => {
+        if (creche.latitude && creche.longitude) {
+          const distance = calculateDistance(
+            currentLocation.latitude,
+            currentLocation.longitude,
+            creche.latitude,
+            creche.longitude
+          );
+          return { ...creche, distance: Math.round(distance * 10) / 10 };
+        }
+        return creche;
+      });
+      
+      // Sort by distance
+      crechesWithDistance.sort((a, b) => {
+        if (a.distance === undefined && b.distance === undefined) return 0;
+        if (a.distance === undefined) return 1;
+        if (b.distance === undefined) return -1;
+        return a.distance - b.distance;
+      });
+    }
+    
+    setCreches(crechesWithDistance);
+    
+    if (crechesWithDistance.length === 0) {
+      const locationName = currentLocation.suburb || currentLocation.city || currentLocation.province || 'selected location';
+      setError(`No creches found in ${locationName}. Try a different location.`);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error fetching creches:', error);
+    setError('Failed to load creches. Please pull down to refresh.');
+    
+    // Try a fallback: get random creches
+    try {
+      const { data } = await supabase
+        .from('creches')
+        .select('*')
+        .limit(3);
+        
+      if (data && data.length > 0) {
+        console.log('🔄 Fallback: Showing random creches');
+        setCreches(data);
+      }
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError);
+    }
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const onRefresh = () => {
     setRefreshing(true);
