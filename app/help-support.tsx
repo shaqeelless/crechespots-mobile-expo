@@ -74,21 +74,18 @@ export default function HelpSupportScreen() {
     {
       icon: Phone,
       title: "Call Support",
-      description: "Speak directly with our support team",
       action: () => Linking.openURL('tel:+27111234567'),
       color: '#10b981'
     },
     {
       icon: Mail,
       title: "Email Support",
-      description: "Send us an email and we'll respond within 24 hours",
       action: () => Linking.openURL('mailto:support@crechespots.co.za'),
       color: '#3b82f6'
     },
     {
       icon: MessageCircle,
       title: "Live Chat",
-      description: "Chat with us in real-time during business hours",
       action: () => Alert.alert('Live Chat', 'Live chat feature coming soon!'),
       color: '#8b5cf6'
     }
