@@ -166,28 +166,7 @@ export default function HelpSupportScreen() {
           </View>
         </View>
 
-        {/* Resources */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Helpful Resources</Text>
-          <View style={styles.resourcesList}>
-            {resources.map((resource, index) => (
-              <Pressable
-                key={index}
-                style={styles.resourceItem}
-                onPress={resource.action}
-              >
-                <View style={styles.resourceIcon}>
-                  <resource.icon size={20} color="#bd84f6" />
-                </View>
-                <View style={styles.resourceContent}>
-                  <Text style={styles.resourceTitle}>{resource.title}</Text>
-                  <Text style={styles.resourceDescription}>{resource.description}</Text>
-                </View>
-                <ChevronRight size={20} color="#9ca3af" />
-              </Pressable>
-            ))}
-          </View>
-        </View>
+
 
         {/* FAQ Section */}
         <View style={styles.section}>
