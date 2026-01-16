@@ -17,11 +17,6 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   ZoomIn,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -34,6 +29,7 @@ interface Child {
   last_name: string;
   date_of_birth: string;
   gender: string;
+  user_id: string; // Add this to ensure we're filtering by user
 }
 
 interface Creche {
@@ -125,43 +121,6 @@ const SkeletonLoader = () => {
         </View>
       </ScrollView>
     </AnimatedView>
-  );
-};
-
-// Animated Skeleton Component
-const AnimatedSkeleton = () => {
-  const translateX = useSharedValue(-width);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  });
-
-  useEffect(() => {
-    translateX.value = withRepeat(
-      withSequence(
-        withTiming(width, { duration: 1000 }),
-        withTiming(-width, { duration: 0 })
-      ),
-      -1
-    );
-  }, []);
-
-  return (
-    <AnimatedView
-      style={[
-        {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
-        },
-        animatedStyle,
-      ]}
-    />
   );
 };
 
@@ -298,8 +257,10 @@ export default function ApplyScreen() {
   const { profile, user } = useAuth();
 
   useEffect(() => {
-    fetchData();
-  }, [id]);
+    if (user?.id) {
+      fetchData();
+    }
+  }, [id, user?.id]);
 
   const fetchData = async () => {
     try {
@@ -315,24 +276,30 @@ export default function ApplyScreen() {
       if (crecheError) throw crecheError;
       setCreche(crecheData);
 
-      // Fetch user's children
+      // Fetch ONLY user's children - FILTER BY USER_ID
+      if (!user?.id) {
+        setChildren([]);
+        return;
+      }
+
       const { data: childrenData, error: childrenError } = await supabase
         .from('children')
         .select('*')
+        .eq('user_id', user.id) // CRITICAL: Only get children belonging to this user
         .order('created_at', { ascending: false });
 
       if (childrenError) throw childrenError;
       setChildren(childrenData || []);
 
-      // Check for existing applications
-      if (childrenData && childrenData.length > 0 && user) {
+      // Check for existing applications for THIS user's children at THIS creche
+      if (childrenData && childrenData.length > 0) {
         const childIds = childrenData.map(child => child.id);
         
         const { data: applicationsData, error: applicationsError } = await supabase
           .from('applications')
           .select('child_id, application_status, submitted_at')
           .eq('creche_id', id)
-          .eq('user_id', user.id)
+          .eq('user_id', user.id) // Ensure we're checking this user's applications
           .in('child_id', childIds);
 
         if (applicationsError) throw applicationsError;
@@ -366,31 +333,13 @@ export default function ApplyScreen() {
     }
   };
 
-  const checkDuplicateApplication = async (childId: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase
-        .from('applications')
-        .select('id')
-        .eq('creche_id', id)
-        .eq('child_id', childId)
-        .eq('user_id', user?.id)
-        .single();
-
-      // If we get data, it means an application already exists
-      return !!data;
-    } catch (error) {
-      // If no record found, it will throw an error
-      return false;
-    }
-  };
-
   const handleSubmit = async () => {
     if (!selectedChild) {
       Alert.alert('Error', 'Please select a child for this application');
       return;
     }
 
-    // Check if child already has an application
+    // Check if child already has an application at this creche
     if (existingApplications[selectedChild]) {
       const existingApp = existingApplications[selectedChild];
       Alert.alert(
@@ -412,13 +361,20 @@ export default function ApplyScreen() {
       return;
     }
 
+    // Additional safety check - verify this child belongs to the user
+    const selectedChildData = children.find(child => child.id === selectedChild);
+    if (!selectedChildData || selectedChildData.user_id !== user.id) {
+      Alert.alert('Error', 'Invalid child selection');
+      return;
+    }
+
     try {
       setSubmitting(true);
 
       const applicationData = {
         creche_id: id,
         child_id: selectedChild,
-        user_id: user.id, // Important: Include user_id for the unique constraint
+        user_id: user.id,
         parent_name: `${profile.first_name} ${profile.last_name}`,
         parent_phone_number: profile.phone_number || '',
         parent_email: profile.email,
@@ -435,6 +391,8 @@ export default function ApplyScreen() {
       if (error) {
         // Check if it's a duplicate key violation
         if (error.code === '23505') { // PostgreSQL unique violation code
+          // Update local state to reflect the duplicate
+          await fetchData(); // Refresh to get the latest applications
           Alert.alert(
             'Duplicate Application',
             'This child already has an application for this creche. Please check your applications.',
@@ -444,8 +402,7 @@ export default function ApplyScreen() {
                 onPress: () => router.push('/applications'),
               },
               { 
-                text: 'Refresh',
-                onPress: () => fetchData()
+                text: 'OK',
               },
             ]
           );
@@ -483,10 +440,11 @@ export default function ApplyScreen() {
     } catch (error: any) {
       console.error('Error submitting application:', error);
       
-      // Handle different error cases
       if (error.code === '23505') {
+        // Duplicate application
+        await fetchData(); // Refresh to get the latest applications
         Alert.alert(
-          'Duplicate Application',
+          'Already Applied',
           'This child already has an application for this creche.',
           [
             {
@@ -494,16 +452,9 @@ export default function ApplyScreen() {
               onPress: () => router.push('/applications'),
             },
             { 
-              text: 'Refresh',
-              onPress: () => fetchData()
+              text: 'OK',
             },
           ]
-        );
-      } else if (error.message?.includes('unique constraint')) {
-        Alert.alert(
-          'Already Applied',
-          'You have already submitted an application for this child at this creche.',
-          [{ text: 'OK' }]
         );
       } else {
         Alert.alert('Error', 'Failed to submit application. Please try again.');

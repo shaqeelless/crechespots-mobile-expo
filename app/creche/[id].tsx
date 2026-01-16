@@ -1,4 +1,3 @@
-// app/creche/[id].tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -96,60 +95,6 @@ interface Article {
 }
 
 type TabType = 'overview' | 'gallery' | 'updates' | 'contact';
-
-// Skeleton Loading Component
-const SkeletonLoader = () => {
-  return (
-    <View style={styles.container}>
-      {/* Gallery Skeleton */}
-      <View style={styles.skeletonGallery}>
-        <View style={styles.skeletonGalleryImage} />
-        <View style={styles.skeletonGalleryDots}>
-          <View style={styles.skeletonGalleryDot} />
-          <View style={styles.skeletonGalleryDot} />
-          <View style={styles.skeletonGalleryDot} />
-        </View>
-      </View>
-      
-      {/* Back Button Skeleton */}
-      <View style={styles.skeletonBackButton} />
-      
-      {/* Share Button Skeleton */}
-      <View style={styles.skeletonShareButton} />
-
-      <ScrollView style={styles.content}>
-        {/* Basic Info Skeleton */}
-        <View style={styles.section}>
-          <View style={styles.skeletonTitleRow}>
-            <View style={styles.skeletonTitle} />
-            <View style={styles.skeletonVerifiedBadge} />
-          </View>
-          <View style={styles.skeletonLocationRow} />
-          <View style={styles.skeletonRatingRow} />
-        </View>
-
-        {/* Pricing Skeleton */}
-        <View style={styles.section}>
-          <View style={styles.skeletonSectionTitle} />
-          <View style={styles.skeletonPricingRow}>
-            <View style={styles.skeletonPrice} />
-            <View style={styles.skeletonCapacity} />
-          </View>
-        </View>
-
-        {/* Description Skeleton */}
-        <View style={styles.section}>
-          <View style={styles.skeletonSectionTitle} />
-          <View style={styles.skeletonDescription}>
-            <View style={styles.skeletonDescriptionLine} />
-            <View style={styles.skeletonDescriptionLine} />
-            <View style={styles.skeletonDescriptionLineShort} />
-          </View>
-        </View>
-      </ScrollView>
-    </View>
-  );
-};
 
 // Gallery Component
 const GalleryView = ({ images }: { images: GalleryImage[] }) => {
@@ -320,7 +265,7 @@ const ArticleCard = ({ article }: { article: Article }) => {
   return (
     <Pressable 
       style={styles.articleCard}
-      onPress={() => router.push(`/articles/${article.id}`)}
+      onPress={() => router.push(`/article/${article.id}`)}
     >
       <View style={styles.articleHeader}>
         <View style={[styles.articleTypeBadge, { backgroundColor: getArticleColor() + '20' }]}>
@@ -724,25 +669,6 @@ export default function CrecheDetailScreen() {
     router.push(`/creche/${id}/articles/create`);
   };
 
-  if (loading) {
-    return <SkeletonLoader />;
-  }
-
-  if (error || !creche) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.errorText}>Error loading creche</Text>
-        <Text style={styles.errorSubtext}>{error || 'Creche not found'}</Text>
-        <Pressable style={styles.retryButton} onPress={fetchCrecheDetails}>
-          <Text style={styles.retryText}>Try Again</Text>
-        </Pressable>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backText}>Go Back</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -753,11 +679,11 @@ export default function CrecheDetailScreen() {
               <Text style={styles.sectionTitle}>Pricing</Text>
               <View style={styles.pricingCard}>
                 <Text style={styles.price}>
-                  {creche.monthly_price ? `R${creche.monthly_price}/month` : 
-                   creche.weekly_price ? `R${creche.weekly_price}/week` : 
-                   creche.price ? `R${creche.price}/day` : 'Contact for pricing'}
+                  {creche?.monthly_price ? `R${creche.monthly_price}/month` : 
+                   creche?.weekly_price ? `R${creche.weekly_price}/week` : 
+                   creche?.price ? `R${creche.price}/day` : 'Contact for pricing'}
                 </Text>
-                {creche.capacity && (
+                {creche?.capacity && (
                   <View style={styles.capacity}>
                     <Users size={14} color="#6b7280" />
                     <Text style={styles.capacityText}>Capacity: {creche.capacity}</Text>
@@ -767,7 +693,7 @@ export default function CrecheDetailScreen() {
             </View>
 
             {/* Description */}
-            {creche.description && (
+            {creche?.description && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>About</Text>
                 <View style={styles.descriptionCard}>
@@ -777,7 +703,7 @@ export default function CrecheDetailScreen() {
             )}
 
             {/* Facilities */}
-            {creche.facilities && (
+            {creche?.facilities && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Facilities</Text>
                 <View style={styles.tagsContainer}>
@@ -795,7 +721,7 @@ export default function CrecheDetailScreen() {
             )}
 
             {/* Services */}
-            {creche.services && (
+            {creche?.services && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Services</Text>
                 <View style={styles.tagsContainer}>
@@ -885,7 +811,7 @@ export default function CrecheDetailScreen() {
           onCreate={createArticle}
         />;
       case 'contact':
-        return <ContactTab creche={creche} />;
+        return <ContactTab creche={creche!} />;
       default:
         return null;
     }
@@ -903,6 +829,30 @@ export default function CrecheDetailScreen() {
         return '#6b7280';
     }
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#bd84f6" />
+        <Text style={styles.loadingText}>Loading creche details...</Text>
+      </View>
+    );
+  }
+
+  if (error || !creche) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <Text style={styles.errorText}>Error loading creche</Text>
+        <Text style={styles.errorSubtext}>{error || 'Creche not found'}</Text>
+        <Pressable style={styles.retryButton} onPress={fetchCrecheDetails}>
+          <Text style={styles.retryText}>Try Again</Text>
+        </Pressable>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backText}>Go Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -940,17 +890,12 @@ export default function CrecheDetailScreen() {
           )}
         </View>
 
+        {/* Location */}
         <View style={styles.locationRow}>
           <MapPin size={16} color="#6b7280" />
           <Text style={styles.locationText}>
             {creche.address || `${creche.suburb}, ${creche.province}`}
           </Text>
-        </View>
-
-        <View style={styles.ratingRow}>
-          <Star size={16} color="#fbbf24" fill="#fbbf24" />
-          <Text style={styles.rating}>4.9</Text>
-          <Text style={styles.reviews}>(156 reviews)</Text>
         </View>
       </View>
 
@@ -986,34 +931,7 @@ export default function CrecheDetailScreen() {
       {renderTabContent()}
 
       {/* Floating Action Buttons */}
-      <View style={styles.floatingButtons}>
-        <Pressable 
-          style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
-          onPress={toggleFavorite}
-          disabled={favoriteLoading}
-        >
-          {favoriteLoading ? (
-            <ActivityIndicator size="small" color={isFavorite ? "#ffffff" : "#374151"} />
-          ) : (
-            <Heart
-              size={20}
-              color={isFavorite ? '#ffffff' : '#374151'}
-              fill={isFavorite ? '#ffffff' : 'transparent'}
-            />
-          )}
-          <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-            {isFavorite ? 'Saved' : 'Save'}
-          </Text>
-        </Pressable>
 
-        <Pressable 
-          style={styles.applyButton} 
-          onPress={handleApplyNow}
-        >
-          <Text style={styles.applyButtonText}>Apply Now</Text>
-          <Send size={16} color="#ffffff" />
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -1027,6 +945,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
   },
   // Gallery Styles
   galleryContainer: {
@@ -1175,21 +1098,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     marginLeft: 6,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rating: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 4,
-  },
-  reviews: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginLeft: 4,
   },
   // Tabs Navigation
   tabsContainer: {
@@ -1642,120 +1550,5 @@ const styles = StyleSheet.create({
   backText: {
     color: '#374151',
     fontWeight: '600',
-  },
-  // Skeleton Loading Styles
-  skeletonGallery: {
-    width: '100%',
-    height: 300,
-    backgroundColor: '#e5e7eb',
-    position: 'relative',
-  },
-  skeletonGalleryImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#d1d5db',
-  },
-  skeletonGalleryDots: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  skeletonGalleryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#9ca3af',
-  },
-  skeletonBackButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e5e7eb',
-  },
-  skeletonShareButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e5e7eb',
-  },
-  skeletonTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  skeletonTitle: {
-    flex: 1,
-    height: 28,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  skeletonVerifiedBadge: {
-    width: 60,
-    height: 24,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-  },
-  skeletonLocationRow: {
-    height: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    marginBottom: 8,
-    width: '70%',
-  },
-  skeletonRatingRow: {
-    height: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    width: '40%',
-  },
-  skeletonSectionTitle: {
-    height: 20,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    marginBottom: 12,
-    width: '30%',
-  },
-  skeletonPricingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  skeletonPrice: {
-    height: 24,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    width: '40%',
-  },
-  skeletonCapacity: {
-    height: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    width: '30%',
-  },
-  skeletonDescription: {
-    gap: 8,
-  },
-  skeletonDescriptionLine: {
-    height: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    width: '100%',
-  },
-  skeletonDescriptionLineShort: {
-    height: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    width: '60%',
   },
 });
