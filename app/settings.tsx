@@ -155,7 +155,7 @@ export default function SettingsScreen() {
       setSignOutLoading(true);
       await signOut();
       setShowSignOutModal(false);
-      router.replace('/(auth)/welcome');
+      router.replace('/(auth)/login');
     } catch (error) {
       console.error('Sign out error:', error);
     } finally {
