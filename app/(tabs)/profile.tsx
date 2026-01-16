@@ -6,7 +6,7 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Alert,
+  Modal,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -25,6 +25,8 @@ import {
   Mail,
   LogOut,
   Camera,
+  X,
+  AlertCircle,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import * as ImagePicker from 'expo-image-picker';
@@ -73,6 +75,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { profile, signOut, loading: authLoading, updateProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [signOutLoading, setSignOutLoading] = useState(false);
 
   const profileMenuItems = [
     {
@@ -98,18 +102,13 @@ export default function ProfileScreen() {
       // Request permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images.');
+        // Instead of Alert, you could show a toast or inline message
+        console.warn('Camera roll permissions not granted');
         return;
       }
 
-      // Launch image picker - SIMPLIFIED: Remove mediaTypes or use correct property
       const result = await ImagePicker.launchImageLibraryAsync({
-        // Try one of these options:
-        // Option 1: Remove mediaTypes entirely (it defaults to images)
-        // Option 2: Use string format
-        mediaTypes: 'images', // Simple string format
-        // Option 3: Use array format
-        // mediaTypes: ['images'],
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -120,194 +119,89 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      // You could show a toast notification here instead
+      console.error('Failed to pick image. Please try again.');
     }
   };
 
-  // Alternative: Check what properties are available
-  const pickImageAlternative = async () => {
+  const uploadImage = async (uri: string) => {
     try {
-      console.log('ImagePicker object:', ImagePicker);
-      console.log('Available properties:', Object.keys(ImagePicker));
+      setUploading(true);
       
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images.');
-        return;
+      if (!profile?.id) {
+        throw new Error('No user profile found');
       }
 
-      // Try different approaches
-      let result;
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const fileName = `${profile.id}_${Date.now()}.jpg`;
       
-      // Approach 1: No mediaTypes property
-      result = await ImagePicker.launchImageLibraryAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+      const { error: uploadError } = await supabase.storage
+        .from('profile-pictures')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await uploadImage(result.assets[0].uri);
-        return;
+      if (uploadError) {
+        throw new Error(`Storage upload failed: ${uploadError.message}`);
       }
+
+      const { data: urlData } = supabase.storage
+        .from('profile-pictures')
+        .getPublicUrl(fileName);
       
-    } catch (error) {
-      console.error('Alternative picker error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please check console for details.');
-    }
-  };
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) {
+        throw new Error('Failed to generate public URL');
+      }
 
-const uploadImage = async (uri: string) => {
-  try {
-    setUploading(true);
-    
-    if (!profile?.id) {
-      throw new Error('No user profile found');
-    }
-
-    console.log('Step 1: Converting image to blob...');
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const fileName = `${profile.id}_${Date.now()}.jpg`;
-    
-    console.log('Step 2: Uploading to storage...');
-    const { error: uploadError, data: uploadData } = await supabase.storage
-      .from('profile-pictures')
-      .upload(fileName, blob, {
-        contentType: 'image/jpeg',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error('Storage upload failed:', uploadError);
-      throw new Error(`Storage upload failed: ${uploadError.message}`);
-    }
-
-    console.log('Step 3: Getting public URL...');
-    const { data: urlData } = supabase.storage
-      .from('profile-pictures')
-      .getPublicUrl(fileName);
-    
-    const publicUrl = urlData?.publicUrl;
-    if (!publicUrl) {
-      throw new Error('Failed to generate public URL');
-    }
-    
-    console.log('Public URL:', publicUrl);
-
-    console.log('Step 4: Updating database...');
-    // Try different approaches
-    let updateError = null;
-    let updateData = null;
-    
-    // Approach 1: Simple update without select
-    const { error: error1 } = await supabase
-      .from('users')
-      .update({
-        profile_picture_url: publicUrl,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', profile.id);
-
-    updateError = error1;
-    
-    // If Approach 1 fails, try Approach 2: With select but different syntax
-    if (updateError) {
-      console.log('Approach 1 failed, trying Approach 2...');
-      const { data: data2, error: error2 } = await supabase
+      const { error: updateError } = await supabase
         .from('users')
         .update({
           profile_picture_url: publicUrl,
           updated_at: new Date().toISOString()
         })
-        .eq('id', profile.id)
-        .select()
-        .single();
-      
-      updateError = error2;
-      updateData = data2;
-    }
-    
-    // If still failing, try Approach 3: Direct fetch
-    if (updateError) {
-      console.log('Approach 2 failed, trying direct fetch...');
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const directResponse = await fetch(
-        `https://bqydopqekazcedqvpxzo.supabase.co/rest/v1/users?id=eq.${profile.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'apikey': 'your-anon-key', // Get from Supabase settings
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal' // Changed from return=representation
-          },
-          body: JSON.stringify({
-            profile_picture_url: publicUrl,
-            updated_at: new Date().toISOString()
-          })
-        }
-      );
-      
-      if (!directResponse.ok) {
-        const errorText = await directResponse.text();
-        throw new Error(`Direct update failed: ${directResponse.status} - ${errorText}`);
+        .eq('id', profile.id);
+
+      if (updateError) {
+        throw new Error(`Database update failed: ${updateError.message}`);
+      }
+
+      if (updateProfile) {
+        await updateProfile();
       }
       
-      console.log('Direct update succeeded');
-    } else {
-      console.log('Database update succeeded via Supabase client');
+      console.log('Profile picture updated successfully!');
+      // You could show a success toast here
+    } catch (error: any) {
+      console.error('Upload error:', error.message || error);
+      // You could show an error toast here instead
+    } finally {
+      setUploading(false);
     }
+  };
 
-    console.log('Step 5: Refreshing profile data...');
-    if (updateProfile) {
-      await updateProfile();
+  const handleSignOut = () => {
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = async () => {
+    try {
+      setSignOutLoading(true);
+      await signOut();
+      setShowSignOutModal(false);
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // You could show an error toast here
+    } finally {
+      setSignOutLoading(false);
     }
+  };
 
-    Alert.alert('Success', 'Profile picture updated successfully!');
-  } catch (error: any) {
-    console.error('Full upload error:', error);
-    
-    // More detailed error messages
-    let errorMessage = error.message || 'Failed to upload image';
-    
-    if (error.message?.includes('permission denied')) {
-      errorMessage = 'Permission denied. Please check your database permissions.';
-    } else if (error.message?.includes('violates row-level security')) {
-      errorMessage = 'Security policy violation. Contact support.';
-    } else if (error.message?.includes('400')) {
-      errorMessage = 'Bad request. The update format might be incorrect.';
-    }
-    
-    Alert.alert('Error', errorMessage);
-  } finally {
-    setUploading(false);
-  }
-};
-
-  const handleSignOut = async () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const result = await signOut();
-            // Handle different response formats
-            if (result?.error || result === false) {
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            } else {
-              router.replace('/(auth)/welcome');
-            }
-          } catch (error) {
-            console.error('Sign out error:', error);
-            Alert.alert('Error', 'Failed to sign out. Please try again.');
-          }
-        },
-      },
-    ]);
+  const cancelSignOut = () => {
+    setShowSignOutModal(false);
   };
 
   const getInitials = (firstName?: string, lastName?: string) => {
@@ -321,6 +215,64 @@ const uploadImage = async (uri: string) => {
 
   return (
     <View style={styles.container}>
+      {/* Sign Out Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showSignOutModal}
+        onRequestClose={cancelSignOut}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIcon}>
+                <AlertCircle size={24} color="#ef4444" />
+              </View>
+              <Pressable 
+                style={styles.modalCloseButton}
+                onPress={cancelSignOut}
+              >
+                <X size={20} color="#6b7280" />
+              </Pressable>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Sign Out?</Text>
+              <Text style={styles.modalMessage}>
+                Are you sure you want to sign out? You'll need to sign back in to access your account.
+              </Text>
+            </View>
+            
+            <View style={styles.modalActions}>
+              <Pressable 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={cancelSignOut}
+                disabled={signOutLoading}
+              >
+                <Text style={[styles.modalButtonText, styles.cancelButtonText]}>Cancel</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.modalButton, styles.signOutConfirmButton]}
+                onPress={confirmSignOut}
+                disabled={signOutLoading}
+              >
+                {signOutLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <LogOut size={16} color="#FFFFFF" />
+                    <Text style={[styles.modalButtonText, styles.signOutConfirmButtonText]}>
+                      Sign Out
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
@@ -337,7 +289,7 @@ const uploadImage = async (uri: string) => {
             <View style={styles.avatarContainer}>
               <Pressable 
                 style={styles.avatarWrapper}
-                onPress={pickImage} // Try pickImageAlternative if this doesn't work
+                onPress={pickImage}
                 disabled={uploading}
               >
                 {uploading ? (
@@ -648,5 +600,90 @@ const styles = StyleSheet.create({
   skeletonText: { 
     borderRadius: 4, 
     backgroundColor: '#e5e7eb' 
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalContent: {
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#6b7280',
+    lineHeight: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  signOutConfirmButton: {
+    backgroundColor: '#ef4444',
+  },
+  signOutConfirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

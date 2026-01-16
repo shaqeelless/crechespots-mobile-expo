@@ -7,8 +7,6 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
-  Modal,
-  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -21,249 +19,25 @@ import {
   Lock,
   Calendar,
   User,
+  Construction,
+  Shield,
+  Wallet,
+  Key,
 } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthContext';
-
-interface PaymentMethod {
-  id: string;
-  card_type: string;
-  last_four: string;
-  expiry_month: number;
-  expiry_year: number;
-  cardholder_name: string;
-  is_default: boolean;
-  created_at: string;
-}
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const { profile } = useAuth();
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [processing, setProcessing] = useState(false);
-
-  const [formData, setFormData] = useState({
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    cardholderName: '',
-    isDefault: false,
-  });
-
-  const [errors, setErrors] = useState({
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    cardholderName: '',
-  });
 
   useEffect(() => {
-    fetchPaymentMethods();
-  }, []);
-
-  const fetchPaymentMethods = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('user_id', profile?.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setPaymentMethods(data || []);
-    } catch (error) {
-      console.error('Error fetching payment methods:', error);
-      Alert.alert('Error', 'Failed to load payment methods');
-    } finally {
+    // Simulate loading for a better UX
+    const timer = setTimeout(() => {
       setLoading(false);
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {
-      cardNumber: '',
-      expiryDate: '',
-      cvv: '',
-      cardholderName: '',
-    };
-
-    const cardNumberClean = formData.cardNumber.replace(/\s/g, '');
-    if (!cardNumberClean || cardNumberClean.length !== 16 || !/^\d+$/.test(cardNumberClean)) {
-      newErrors.cardNumber = 'Please enter a valid 16-digit card number';
-    }
-
-    const expiryRegex = /^(0[1-9]|1[0-2])\/([0-9]{2})$/;
-    if (!expiryRegex.test(formData.expiryDate)) {
-      newErrors.expiryDate = 'Please enter expiry date in MM/YY format';
-    }
-
-    if (!formData.cvv || formData.cvv.length < 3 || formData.cvv.length > 4 || !/^\d+$/.test(formData.cvv)) {
-      newErrors.cvv = 'Please enter a valid CVV';
-    }
-
-    if (!formData.cardholderName.trim()) {
-      newErrors.cardholderName = 'Please enter cardholder name';
-    }
-
-    setErrors(newErrors);
-    return !Object.values(newErrors).some(error => error !== '');
-  };
-
-  const formatCardNumber = (text: string) => {
-    const cleaned = text.replace(/\s/g, '').replace(/\D/g, '');
-    const formatted = cleaned.replace(/(\d{4})/g, '$1 ').trim();
-    return formatted.substring(0, 19);
-  };
-
-  const formatExpiryDate = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length >= 3) {
-      return `${cleaned.substring(0, 2)}/${cleaned.substring(2, 4)}`;
-    }
-    return cleaned;
-  };
-
-  const getCardType = (cardNumber: string): string => {
-    const cleanNumber = cardNumber.replace(/\s/g, '');
+    }, 1000);
     
-    if (/^4/.test(cleanNumber)) return 'Visa';
-    if (/^5[1-5]/.test(cleanNumber)) return 'Mastercard';
-    if (/^3[47]/.test(cleanNumber)) return 'American Express';
-    if (/^6(?:011|5)/.test(cleanNumber)) return 'Discover';
-    
-    return 'Credit Card';
-  };
-
-  const handleAddPaymentMethod = async () => {
-    if (!validateForm()) return;
-
-    try {
-      setProcessing(true);
-
-      const cardNumberClean = formData.cardNumber.replace(/\s/g, '');
-      const cardType = getCardType(cardNumberClean);
-      const lastFour = cardNumberClean.slice(-4);
-
-      const [expiryMonth, expiryYear] = formData.expiryDate.split('/');
-      const fullYear = 2000 + parseInt(expiryYear, 10);
-
-      if (formData.isDefault) {
-        await supabase
-          .from('payment_methods')
-          .update({ is_default: false })
-          .eq('user_id', profile?.id)
-          .eq('is_default', true);
-      }
-
-      const { error } = await supabase
-        .from('payment_methods')
-        .insert([
-          {
-            user_id: profile?.id,
-            card_type: cardType,
-            last_four: lastFour,
-            expiry_month: parseInt(expiryMonth, 10),
-            expiry_year: fullYear,
-            cardholder_name: formData.cardholderName.trim(),
-            is_default: formData.isDefault || paymentMethods.length === 0,
-          },
-        ]);
-
-      if (error) throw error;
-
-      Alert.alert('Success', 'Payment method added successfully');
-      setShowAddModal(false);
-      resetForm();
-      fetchPaymentMethods();
-    } catch (error) {
-      console.error('Error adding payment method:', error);
-      Alert.alert('Error', 'Failed to add payment method. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleSetDefault = async (methodId: string) => {
-    try {
-      setProcessing(true);
-
-      await supabase
-        .from('payment_methods')
-        .update({ is_default: false })
-        .eq('user_id', profile?.id);
-
-      const { error } = await supabase
-        .from('payment_methods')
-        .update({ is_default: true })
-        .eq('id', methodId)
-        .eq('user_id', profile?.id);
-
-      if (error) throw error;
-
-      Alert.alert('Success', 'Default payment method updated');
-      fetchPaymentMethods();
-    } catch (error) {
-      console.error('Error setting default payment method:', error);
-      Alert.alert('Error', 'Failed to update default payment method');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleDeletePaymentMethod = async (methodId: string) => {
-    const method = paymentMethods.find(pm => pm.id === methodId);
-    
-    Alert.alert(
-      'Delete Payment Method',
-      `Are you sure you want to delete your ${method?.card_type} card ending in ${method?.last_four}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('payment_methods')
-                .delete()
-                .eq('id', methodId);
-
-              if (error) throw error;
-
-              Alert.alert('Success', 'Payment method deleted successfully');
-              fetchPaymentMethods();
-            } catch (error) {
-              console.error('Error deleting payment method:', error);
-              Alert.alert('Error', 'Failed to delete payment method');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const resetForm = () => {
-    setFormData({
-      cardNumber: '',
-      expiryDate: '',
-      cvv: '',
-      cardholderName: '',
-      isDefault: false,
-    });
-    setErrors({
-      cardNumber: '',
-      expiryDate: '',
-      cvv: '',
-      cardholderName: '',
-    });
-  };
+    return () => clearTimeout(timer);
+  }, []);
 
   if (loading) {
     return (
@@ -277,7 +51,7 @@ export default function PaymentMethodsScreen() {
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#bd84f6" />
-          <Text style={styles.loadingText}>Loading payment methods...</Text>
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
     );
@@ -294,215 +68,121 @@ export default function PaymentMethodsScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Add New Card Button */}
-        <Pressable 
-          style={styles.addCardButton}
-          onPress={() => setShowAddModal(true)}
-        >
-          <View style={styles.addCardContent}>
-            <Plus size={24} color="#bd84f6" />
-            <Text style={styles.addCardText}>Add New Card</Text>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Feature Coming Soon Message */}
+        <View style={styles.comingSoonSection}>
+          <View style={styles.comingSoonIconContainer}>
+            <Construction size={48} color="#bd84f6" />
           </View>
-        </Pressable>
-
-        {/* Payment Methods List */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Payment Methods</Text>
-          
-          {paymentMethods.length === 0 ? (
-            <View style={styles.emptyState}>
-              <CreditCard size={48} color="#9ca3af" />
-              <Text style={styles.emptyStateTitle}>No payment methods</Text>
-              <Text style={styles.emptyStateText}>
-                Add a payment method to get started with payments and subscriptions.
-              </Text>
-            </View>
-          ) : (
-            paymentMethods.map((method) => (
-              <View key={method.id} style={styles.paymentCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardInfo}>
-                    <View style={styles.cardIcon}>
-                      <CreditCard size={20} color="#bd84f6" />
-                    </View>
-                    <View style={styles.cardDetails}>
-                      <Text style={styles.cardType}>{method.card_type}</Text>
-                      <Text style={styles.cardNumber}>
-                        •••• {method.last_four}
-                      </Text>
-                      <Text style={styles.cardExpiry}>
-                        Expires {method.expiry_month.toString().padStart(2, '0')}/{method.expiry_year.toString().slice(-2)}
-                      </Text>
-                      <Text style={styles.cardholderName}>
-                        {method.cardholder_name}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.cardActions}>
-                    {method.is_default ? (
-                      <View style={styles.defaultBadge}>
-                        <Check size={12} color="#ffffff" />
-                        <Text style={styles.defaultBadgeText}>Default</Text>
-                      </View>
-                    ) : (
-                      <Pressable 
-                        style={styles.setDefaultButton}
-                        onPress={() => handleSetDefault(method.id)}
-                        disabled={processing}
-                      >
-                        <Text style={styles.setDefaultText}>Set Default</Text>
-                      </Pressable>
-                    )}
-                    
-                    <Pressable 
-                      style={styles.deleteButton}
-                      onPress={() => handleDeletePaymentMethod(method.id)}
-                    >
-                      <Trash2 size={16} color="#ef4444" />
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
-        {/* Security Notice */}
-        <View style={styles.securitySection}>
-          <Lock size={16} color="#10b981" />
-          <Text style={styles.securityText}>
-            Your payment information is secure and encrypted. We never store your full card details.
+          <Text style={styles.comingSoonTitle}>
+            Feature Coming Soon
+          </Text>
+          <Text style={styles.comingSoonText}>
+            The payment methods feature is currently under development. We're working hard to bring you a secure and convenient way to manage your payment options.
           </Text>
         </View>
-      </ScrollView>
 
-      {/* Add Payment Method Modal */}
-      <Modal
-        visible={showAddModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => {
-          setShowAddModal(false);
-          resetForm();
-        }}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Payment Method</Text>
-            <Pressable 
-              style={styles.closeButton}
-              onPress={() => {
-                setShowAddModal(false);
-                resetForm();
-              }}
-            >
-              <X size={24} color="#374151" />
-            </Pressable>
+        {/* Security Information */}
+        <View style={styles.securitySection}>
+          <View style={styles.securityHeader}>
+            <Shield size={24} color="#10b981" />
+            <Text style={styles.securityTitle}>Security First</Text>
           </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Card Number</Text>
-              <View style={[styles.inputContainer, errors.cardNumber && styles.inputError]}>
-                <CreditCard size={20} color="#9ca3af" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="1234 5678 9012 3456"
-                  value={formData.cardNumber}
-                  onChangeText={(text) => setFormData({ ...formData, cardNumber: formatCardNumber(text) })}
-                  keyboardType="numeric"
-                  maxLength={19}
-                />
+          <Text style={styles.securityText}>
+            When this feature launches, your payment information will be:
+          </Text>
+          
+          <View style={styles.securityList}>
+            <View style={styles.securityItem}>
+              <View style={[styles.securityIcon, { backgroundColor: '#f0fdf4' }]}>
+                <Lock size={16} color="#10b981" />
               </View>
-              {errors.cardNumber ? <Text style={styles.errorText}>{errors.cardNumber}</Text> : null}
-            </View>
-
-            <View style={styles.inputRow}>
-              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.inputLabel}>Expiry Date</Text>
-                <View style={[styles.inputContainer, errors.expiryDate && styles.inputError]}>
-                  <Calendar size={20} color="#9ca3af" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="MM/YY"
-                    value={formData.expiryDate}
-                    onChangeText={(text) => setFormData({ ...formData, expiryDate: formatExpiryDate(text) })}
-                    keyboardType="numeric"
-                    maxLength={5}
-                  />
-                </View>
-                {errors.expiryDate ? <Text style={styles.errorText}>{errors.expiryDate}</Text> : null}
-              </View>
-
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.inputLabel}>CVV</Text>
-                <View style={[styles.inputContainer, errors.cvv && styles.inputError]}>
-                  <Lock size={20} color="#9ca3af" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="123"
-                    value={formData.cvv}
-                    onChangeText={(text) => setFormData({ ...formData, cvv: text.replace(/\D/g, '').substring(0, 4) })}
-                    keyboardType="numeric"
-                    maxLength={4}
-                    secureTextEntry
-                  />
-                </View>
-                {errors.cvv ? <Text style={styles.errorText}>{errors.cvv}</Text> : null}
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Cardholder Name</Text>
-              <View style={[styles.inputContainer, errors.cardholderName && styles.inputError]}>
-                <User size={20} color="#9ca3af" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="John Doe"
-                  value={formData.cardholderName}
-                  onChangeText={(text) => setFormData({ ...formData, cardholderName: text })}
-                  autoCapitalize="words"
-                />
-              </View>
-              {errors.cardholderName ? <Text style={styles.errorText}>{errors.cardholderName}</Text> : null}
-            </View>
-
-            <Pressable
-              style={styles.checkboxContainer}
-              onPress={() => setFormData({ ...formData, isDefault: !formData.isDefault })}
-            >
-              <View style={[styles.checkbox, formData.isDefault && styles.checkboxChecked]}>
-                {formData.isDefault && <Check size={14} color="#ffffff" />}
-              </View>
-              <Text style={styles.checkboxLabel}>Set as default payment method</Text>
-            </Pressable>
-
-            <View style={styles.modalSecuritySection}>
-              <Lock size={14} color="#10b981" />
-              <Text style={styles.modalSecurityText}>
-                Your card details are secure and encrypted. We use industry-standard security measures.
+              <Text style={styles.securityItemText}>
+                Encrypted with bank-level security
               </Text>
             </View>
-
-            <Pressable
-              style={[styles.addButton, processing && styles.disabledButton]}
-              onPress={handleAddPaymentMethod}
-              disabled={processing}
-            >
-              {processing ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Plus size={20} color="#ffffff" />
-              )}
-              <Text style={styles.addButtonText}>
-                {processing ? 'Adding Card...' : 'Add Payment Method'}
+            
+            <View style={styles.securityItem}>
+              <View style={[styles.securityIcon, { backgroundColor: '#fef2f2' }]}>
+                <Key size={16} color="#ef4444" />
+              </View>
+              <Text style={styles.securityItemText}>
+                Never stored in plain text
               </Text>
-            </Pressable>
-          </ScrollView>
+            </View>
+            
+            <View style={styles.securityItem}>
+              <View style={[styles.securityIcon, { backgroundColor: '#f0f9ff' }]}>
+                <Shield size={16} color="#0ea5e9" />
+              </View>
+              <Text style={styles.securityItemText}>
+                Protected by industry standards
+              </Text>
+            </View>
+          </View>
         </View>
-      </Modal>
+
+        {/* What to Expect Section */}
+        <View style={styles.featuresSection}>
+          <Text style={styles.featuresTitle}>What You'll Be Able To Do</Text>
+          
+          <View style={styles.featureCard}>
+            <View style={[styles.featureIcon, { backgroundColor: '#fef2f8' }]}>
+              <CreditCard size={24} color="#db2777" />
+            </View>
+            <View style={styles.featureContent}>
+              <Text style={styles.featureTitle}>Add Multiple Cards</Text>
+              <Text style={styles.featureDescription}>
+                Store multiple credit or debit cards for easy access during checkout.
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.featureCard}>
+            <View style={[styles.featureIcon, { backgroundColor: '#f0f9ff' }]}>
+              <Wallet size={24} color="#0ea5e9" />
+            </View>
+            <View style={styles.featureContent}>
+              <Text style={styles.featureTitle}>Set Default Method</Text>
+              <Text style={styles.featureDescription}>
+                Choose your preferred payment method for faster transactions.
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.featureCard}>
+            <View style={[styles.featureIcon, { backgroundColor: '#f0fdf4' }]}>
+              <Check size={24} color="#10b981" />
+            </View>
+            <View style={styles.featureContent}>
+              <Text style={styles.featureTitle}>Easy Management</Text>
+              <Text style={styles.featureDescription}>
+                Add, edit, or remove payment methods with just a few taps.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+
+
+        {/* Contact Support */}
+        <View style={styles.supportSection}>
+          <Text style={styles.supportTitle}>Have Payment Questions?</Text>
+          <Text style={styles.supportText}>
+            If you have questions about payments, billing, or need assistance, our support team is here to help.
+          </Text>
+          <Pressable 
+            style={styles.supportButton}
+            onPress={() => router.push('/help-support')}
+          >
+            <Text style={styles.supportButtonText}>Get Support</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -539,8 +219,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -552,274 +235,214 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
   },
-  addCardButton: {
+  comingSoonSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#bd84f6',
-    borderStyle: 'dashed',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  addCardContent: {
-    flexDirection: 'row',
+  comingSoonIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#fdf2f8',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    marginBottom: 16,
   },
-  addCardText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#bd84f6',
+  comingSoonTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  section: {
+  comingSoonText: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  securitySection: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  sectionTitle: {
+  securityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  securityTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#374151',
-    marginBottom: 16,
   },
-  paymentCard: {
+  securityText: {
+    fontSize: 15,
+    color: '#6b7280',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  securityList: {
+    gap: 12,
+  },
+  securityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  securityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  securityItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  featuresSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  featuresTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 20,
+  },
+  featureCard: {
+    flexDirection: 'row',
     backgroundColor: '#f9fafb',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardInfo: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#fdf2f8',
+  featureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  cardDetails: {
+  featureContent: {
     flex: 1,
   },
-  cardType: {
+  featureTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 4,
   },
-  cardNumber: {
+  featureDescription: {
     fontSize: 14,
     color: '#6b7280',
-    marginBottom: 2,
-  },
-  cardExpiry: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  cardholderName: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
-  cardActions: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  defaultBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#10b981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  defaultBadgeText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-  setDefaultButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-  },
-  setDefaultText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  deleteButton: {
-    padding: 6,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
     lineHeight: 20,
   },
-  securitySection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  paymentTypesSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  securityText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#6b7280',
-    lineHeight: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#f4fcfe',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: '#ffffff',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#374151',
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
     borderRadius: 20,
-    backgroundColor: '#f9fafb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    padding: 24,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  inputError: {
-    borderColor: '#ef4444',
-  },
-  input: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+  paymentTypesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#374151',
+    marginBottom: 16,
   },
-  inputRow: {
+  paymentTypesGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  errorText: {
-    fontSize: 12,
-    color: '#ef4444',
-    marginTop: 4,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  checkboxChecked: {
-    backgroundColor: '#bd84f6',
-    borderColor: '#bd84f6',
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  modalSecuritySection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#f0fdf4',
+  paymentTypeCard: {
+    width: '48%',
+    backgroundColor: '#f9fafb',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  modalSecurityText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#065f46',
-    lineHeight: 16,
-  },
-  addButton: {
-    flexDirection: 'row',
+  paymentTypeIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fdf2f8',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#bd84f6',
-    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  paymentTypeText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#bd84f6',
+  },
+  paymentTypeName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  supportSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  supportTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  supportText: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  supportButton: {
+    backgroundColor: '#fdf2f8',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
-    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: '#bd84f6',
   },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  supportButtonText: {
+    color: '#bd84f6',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

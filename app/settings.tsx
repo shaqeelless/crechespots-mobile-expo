@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,27 +6,24 @@ import {
   ScrollView,
   Pressable,
   Switch,
-  Alert,
-  Linking,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
   User,
-  Bell,
   Shield,
   HelpCircle,
-  Moon,
   Globe,
   FileText,
   LogOut,
   ChevronRight,
-  Mail,
-  Star,
-  Share2,
-  Trash2,
+  X,
+  AlertCircle,
 } from 'lucide-react-native';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import * as Location from 'expo-location';
 
 const SettingsItem = ({ icon: Icon, title, description, value, onPress, onToggle, showSwitch, showArrow, color }: any) => (
   <Pressable 
@@ -55,51 +52,124 @@ const SettingsItem = ({ icon: Icon, title, description, value, onPress, onToggle
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile } = useAuth();
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [settings, setSettings] = useState({
-    notifications: true,
-    darkMode: false,
-    locationServices: true,
-    biometricAuth: false,
-    emailUpdates: true,
-    smsAlerts: false,
+    locationServices: false,
   });
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [signOutLoading, setSignOutLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [locationPermission, setLocationPermission] = useState<string | null>(null);
 
-  const toggleSetting = (setting: string) => {
-    setSettings(prev => ({
-      ...prev,
-      [setting]: !prev[setting as keyof typeof prev]
-    }));
+  useEffect(() => {
+    fetchUserProfile();
+    checkLocationPermission();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        setUserProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkLocationPermission = async () => {
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setLocationPermission(status);
+      setSettings(prev => ({ ...prev, locationServices: status === 'granted' }));
+    } catch (error) {
+      console.error('Error checking location permission:', error);
+    }
+  };
+
+  const toggleLocationServices = async () => {
+    if (settings.locationServices) {
+      // Turning off location services
+      setSettings(prev => ({ ...prev, locationServices: false }));
+      // Optionally: Update user preferences in database
+      await updateUserPreferences({ location_services_enabled: false });
+    } else {
+      // Request location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status);
+      
+      if (status === 'granted') {
+        setSettings(prev => ({ ...prev, locationServices: true }));
+        // Optionally: Update user preferences in database
+        await updateUserPreferences({ location_services_enabled: true });
+        
+        // Get current position to verify it works
+        try {
+          const location = await Location.getCurrentPositionAsync({});
+          console.log('Location access granted:', location.coords);
+        } catch (error) {
+          console.error('Error getting location:', error);
+        }
+      } else {
+        // Permission denied
+        setSettings(prev => ({ ...prev, locationServices: false }));
+        console.log('Location permission denied');
+      }
+    }
+  };
+
+  const updateUserPreferences = async (preferences: any) => {
+    try {
+      if (user?.id) {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            preferences: preferences,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error updating user preferences:', error);
+    }
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-          onPress: signOut
-        }
-      ]
-    );
+    setShowSignOutModal(true);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. All your data will be permanently deleted.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete Account', 
-          style: 'destructive',
-          onPress: () => Alert.alert('Account Deletion', 'Account deletion feature would be implemented here')
-        }
-      ]
-    );
+  const confirmSignOut = async () => {
+    try {
+      setSignOutLoading(true);
+      await signOut();
+      setShowSignOutModal(false);
+      router.replace('/(auth)/welcome');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    } finally {
+      setSignOutLoading(false);
+    }
+  };
+
+  const cancelSignOut = () => {
+    setShowSignOutModal(false);
+  };
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return user?.email?.charAt(0).toUpperCase() || 'U';
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
 
   const accountSettings = [
@@ -112,18 +182,10 @@ export default function SettingsScreen() {
       showArrow: true
     },
     {
-      icon: Bell,
-      title: "Notifications",
-      description: "Manage your notification preferences",
-      onPress: () => router.push('/notifications'),
-      color: '#8b5cf6',
-      showArrow: true
-    },
-    {
       icon: Shield,
       title: "Privacy & Security",
       description: "Control your privacy settings",
-      onPress: () => router.push('/safety-center'),
+      onPress: () => router.push('/safety-centre'),
       color: '#10b981',
       showArrow: true
     }
@@ -131,39 +193,12 @@ export default function SettingsScreen() {
 
   const appSettings = [
     {
-      icon: Bell,
-      title: "Push Notifications",
-      description: "Receive app notifications",
-      value: settings.notifications,
-      onToggle: () => toggleSetting('notifications'),
-      color: '#f59e0b',
-      showSwitch: true
-    },
-    {
-      icon: Moon,
-      title: "Dark Mode",
-      description: "Switch to dark theme",
-      value: settings.darkMode,
-      onToggle: () => toggleSetting('darkMode'),
-      color: '#6b7280',
-      showSwitch: true
-    },
-    {
       icon: Globe,
       title: "Location Services",
       description: "Use your location for nearby creches",
       value: settings.locationServices,
-      onToggle: () => toggleSetting('locationServices'),
+      onToggle: toggleLocationServices,
       color: '#ef4444',
-      showSwitch: true
-    },
-    {
-      icon: Shield,
-      title: "Biometric Authentication",
-      description: "Use fingerprint or face ID to login",
-      value: settings.biometricAuth,
-      onToggle: () => toggleSetting('biometricAuth'),
-      color: '#10b981',
       showSwitch: true
     }
   ];
@@ -181,51 +216,66 @@ export default function SettingsScreen() {
       icon: FileText,
       title: "Terms & Policies",
       description: "View our terms of service and privacy policy",
-      onPress: () => Alert.alert('Terms', 'Terms and policies would open here'),
+      onPress: () => router.push('/terms-policies'),
       color: '#6b7280',
       showArrow: true
-    },
-    {
-      icon: Star,
-      title: "Rate Our App",
-      description: "Share your experience with us",
-      onPress: () => Alert.alert('Rate App', 'App store rating would open here'),
-      color: '#f59e0b',
-      showArrow: true
-    },
-    {
-      icon: Share2,
-      title: "Share App",
-      description: "Share CrecheSpots with other parents",
-      onPress: () => Alert.alert('Share', 'Share functionality would open here'),
-      color: '#8b5cf6',
-      showArrow: true
-    }
-  ];
-
-  const communicationSettings = [
-    {
-      icon: Mail,
-      title: "Email Updates",
-      description: "Receive updates and newsletters via email",
-      value: settings.emailUpdates,
-      onToggle: () => toggleSetting('emailUpdates'),
-      color: '#3b82f6',
-      showSwitch: true
-    },
-    {
-      icon: Bell,
-      title: "SMS Alerts",
-      description: "Get important alerts via SMS",
-      value: settings.smsAlerts,
-      onToggle: () => toggleSetting('smsAlerts'),
-      color: '#10b981',
-      showSwitch: true
     }
   ];
 
   return (
     <View style={styles.container}>
+      {/* Sign Out Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showSignOutModal}
+        onRequestClose={cancelSignOut}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIcon}>
+                <AlertCircle size={24} color="#ef4444" />
+              </View>
+              <Pressable 
+                style={styles.modalCloseButton}
+                onPress={cancelSignOut}
+              >
+                <X size={20} color="#6b7280" />
+              </Pressable>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Sign Out?</Text>
+              <Text style={styles.modalMessage}>
+                Are you sure you want to sign out? You'll need to sign back in to access your account.
+              </Text>
+            </View>
+            
+            <View style={styles.modalActions}>
+              <Pressable 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={cancelSignOut}
+                disabled={signOutLoading}
+              >
+                <Text style={[styles.modalButtonText, styles.cancelButtonText]}>Cancel</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.modalButton, styles.signOutConfirmButton]}
+                onPress={confirmSignOut}
+                disabled={signOutLoading}
+              >
+                <LogOut size={16} color="#FFFFFF" />
+                <Text style={[styles.modalButtonText, styles.signOutConfirmButtonText]}>
+                  Sign Out
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -239,15 +289,37 @@ export default function SettingsScreen() {
         {/* User Info */}
         <View style={styles.userSection}>
           <View style={styles.userAvatar}>
-            <Text style={styles.userAvatarText}>
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
-            </Text>
+            {loading ? (
+              <View style={styles.avatarSkeleton} />
+            ) : userProfile?.profile_picture_url ? (
+              <Text style={styles.userAvatarText}>
+                {getInitials(userProfile?.first_name, userProfile?.last_name)}
+              </Text>
+            ) : (
+              <Text style={styles.userAvatarText}>
+                {getInitials(profile?.first_name, profile?.last_name) || 'U'}
+              </Text>
+            )}
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>
-              {user?.user_metadata?.name || 'User'}
-            </Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
+            {loading ? (
+              <>
+                <View style={[styles.skeletonText, { width: '60%', height: 18, marginBottom: 4 }]} />
+                <View style={[styles.skeletonText, { width: '80%', height: 14 }]} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.userName}>
+                  {userProfile?.first_name && userProfile?.last_name 
+                    ? `${userProfile.first_name} ${userProfile.last_name}`
+                    : profile?.first_name && profile?.last_name
+                    ? `${profile.first_name} ${profile.last_name}`
+                    : user?.email?.split('@')[0] || 'User'
+                  }
+                </Text>
+                <Text style={styles.userEmail}>{user?.email}</Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -271,16 +343,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Communication */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Communication</Text>
-          <View style={styles.settingsGroup}>
-            {communicationSettings.map((item, index) => (
-              <SettingsItem key={index} {...item} />
-            ))}
-          </View>
-        </View>
-
         {/* Support */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
@@ -297,16 +359,11 @@ export default function SettingsScreen() {
           <Text style={styles.appCopyright}>© 2024 CrecheSpots. All rights reserved.</Text>
         </View>
 
-        {/* Danger Zone */}
+        {/* Sign Out */}
         <View style={styles.dangerSection}>
           <Pressable style={styles.dangerButton} onPress={handleSignOut}>
             <LogOut size={20} color="#ef4444" />
             <Text style={styles.dangerButtonText}>Sign Out</Text>
-          </Pressable>
-          
-          <Pressable style={[styles.dangerButton, styles.deleteButton]} onPress={handleDeleteAccount}>
-            <Trash2 size={20} color="#ef4444" />
-            <Text style={styles.dangerButtonText}>Delete Account</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -371,6 +428,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
+  },
+  avatarSkeleton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#e5e7eb',
   },
   userAvatarText: {
     color: '#ffffff',
@@ -465,13 +528,98 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f3f4f6',
   },
-  deleteButton: {
-    borderColor: '#fef2f2',
-    backgroundColor: '#fef2f2',
-  },
   dangerButtonText: {
     color: '#ef4444',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalContent: {
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#6b7280',
+    lineHeight: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  signOutConfirmButton: {
+    backgroundColor: '#ef4444',
+  },
+  signOutConfirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  skeletonText: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
   },
 });

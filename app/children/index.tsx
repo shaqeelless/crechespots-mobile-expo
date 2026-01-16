@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, CreditCard as Edit3, Calendar, User } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Child {
   id: string;
@@ -20,6 +21,7 @@ interface Child {
   gender: string;
   profile_picture_url: string;
   created_at: string;
+  user_id: string; // Make sure this column exists in your table
 }
 
 const ChildCardSkeleton = () => (
@@ -39,19 +41,30 @@ const ChildCardSkeleton = () => (
 
 export default function ChildrenScreen() {
   const router = useRouter();
+  const { user } = useAuth(); // Get current user from auth context
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchChildren();
-  }, []);
+    if (user) {
+      fetchChildren();
+    }
+  }, [user]); // Re-fetch when user changes
 
   const fetchChildren = async () => {
     try {
       setLoading(true);
+      
+      if (!user) {
+        Alert.alert('Error', 'No user logged in');
+        setChildren([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('children')
         .select('*')
+        .eq('user_id', user.id) // Filter by user ID
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -129,6 +142,27 @@ export default function ChildrenScreen() {
       </Pressable>
     </Pressable>
   );
+
+  // Show loading or no user state
+  if (!user && !loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#374151" />
+          </Pressable>
+          <Text style={styles.headerTitle}>My Children</Text>
+          <View style={styles.addButton} />
+        </View>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>Please sign in</Text>
+          <Text style={styles.emptyDescription}>
+            You need to be signed in to view your children
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

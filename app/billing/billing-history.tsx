@@ -16,6 +16,9 @@ import {
   XCircle,
   Clock,
   Filter,
+  Construction,
+  Calendar,
+  CreditCard,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -41,76 +44,13 @@ export default function BillingHistoryScreen() {
   const [filter, setFilter] = useState<'all' | 'completed' | 'pending' | 'failed'>('all');
 
   useEffect(() => {
-    fetchBillingHistory();
-  }, []);
-
-  const fetchBillingHistory = async () => {
-    try {
-      setLoading(true);
-      
-      // This would typically come from your billing/invoice table
-      // For now, we'll use mock data
-      const mockData: BillingHistory[] = [
-        {
-          id: '1',
-          amount: 29.99,
-          currency: 'USD',
-          status: 'completed',
-          description: 'Monthly Subscription - Premium Plan',
-          invoice_number: 'INV-2024-001',
-          payment_method: 'Visa •••• 4242',
-          created_at: '2024-01-15T10:30:00Z',
-        },
-        {
-          id: '2',
-          amount: 29.99,
-          currency: 'USD',
-          status: 'completed',
-          description: 'Monthly Subscription - Premium Plan',
-          invoice_number: 'INV-2023-012',
-          payment_method: 'Visa •••• 4242',
-          created_at: '2023-12-15T10:30:00Z',
-        },
-        {
-          id: '3',
-          amount: 49.99,
-          currency: 'USD',
-          status: 'completed',
-          description: 'One-time Setup Fee',
-          invoice_number: 'INV-2023-011',
-          payment_method: 'Visa •••• 4242',
-          created_at: '2023-11-20T14:45:00Z',
-        },
-        {
-          id: '4',
-          amount: 29.99,
-          currency: 'USD',
-          status: 'pending',
-          description: 'Monthly Subscription - Premium Plan',
-          invoice_number: 'INV-2024-002',
-          payment_method: 'Visa •••• 4242',
-          created_at: '2024-01-20T09:15:00Z',
-          due_date: '2024-02-15T00:00:00Z',
-        },
-        {
-          id: '5',
-          amount: 29.99,
-          currency: 'USD',
-          status: 'failed',
-          description: 'Monthly Subscription - Premium Plan',
-          invoice_number: 'INV-2023-010',
-          payment_method: 'Visa •••• 4242',
-          created_at: '2023-10-15T10:30:00Z',
-        },
-      ];
-
-      setBillingHistory(mockData);
-    } catch (error) {
-      console.error('Error fetching billing history:', error);
-    } finally {
+    // Simulate loading for a better UX
+    const timer = setTimeout(() => {
       setLoading(false);
-    }
-  };
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -153,10 +93,6 @@ export default function BillingHistoryScreen() {
     }).format(amount);
   };
 
-  const filteredHistory = billingHistory.filter(item => 
-    filter === 'all' || item.status === filter
-  );
-
   if (loading) {
     return (
       <View style={styles.container}>
@@ -169,7 +105,7 @@ export default function BillingHistoryScreen() {
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#bd84f6" />
-          <Text style={styles.loadingText}>Loading billing history...</Text>
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
     );
@@ -186,136 +122,128 @@ export default function BillingHistoryScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Filter Tabs */}
-        <View style={styles.filterSection}>
-          <Text style={styles.filterLabel}>Filter by status:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.filterTabs}>
-              {[
-                { key: 'all', label: 'All' },
-                { key: 'completed', label: 'Completed' },
-                { key: 'pending', label: 'Pending' },
-                { key: 'failed', label: 'Failed' },
-              ].map((tab) => (
-                <Pressable
-                  key={tab.key}
-                  style={[
-                    styles.filterTab,
-                    filter === tab.key && styles.activeFilterTab,
-                  ]}
-                  onPress={() => setFilter(tab.key as any)}
-                >
-                  <Text
-                    style={[
-                      styles.filterTabText,
-                      filter === tab.key && styles.activeFilterTabText,
-                    ]}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Feature Coming Soon Message */}
+        <View style={styles.comingSoonSection}>
+          <View style={styles.comingSoonIconContainer}>
+            <Construction size={48} color="#bd84f6" />
+          </View>
+          <Text style={styles.comingSoonTitle}>
+            Feature Coming Soon
+          </Text>
+          <Text style={styles.comingSoonText}>
+            The billing history feature is currently under development. We're working hard to bring you a comprehensive view of all your transactions and invoices.
+          </Text>
         </View>
 
-        {/* Billing History List */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transaction History</Text>
-          
-          {filteredHistory.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Receipt size={48} color="#9ca3af" />
-              <Text style={styles.emptyStateTitle}>No transactions found</Text>
-              <Text style={styles.emptyStateText}>
-                {filter === 'all' 
-                  ? "You don't have any transactions yet."
-                  : `No ${filter} transactions found.`
-                }
-              </Text>
+        {/* Information Cards */}
+        <View style={styles.infoCards}>
+          <View style={styles.infoCard}>
+            <View style={[styles.infoCardIcon, { backgroundColor: '#eef2ff' }]}>
+              <Calendar size={24} color="#4f46e5" />
             </View>
-          ) : (
-            filteredHistory.map((item) => (
-              <View key={item.id} style={styles.transactionCard}>
-                <View style={styles.transactionHeader}>
-                  <View style={styles.transactionInfo}>
-                    <Text style={styles.transactionDescription}>
-                      {item.description}
-                    </Text>
-                    <Text style={styles.transactionInvoice}>
-                      {item.invoice_number}
-                    </Text>
-                    <Text style={styles.transactionDate}>
-                      {formatDate(item.created_at)}
-                    </Text>
-                    <Text style={styles.transactionMethod}>
-                      {item.payment_method}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.transactionAmount}>
-                    <Text style={styles.amountText}>
-                      {formatCurrency(item.amount, item.currency)}
-                    </Text>
-                    <View style={styles.statusContainer}>
-                      {getStatusIcon(item.status)}
-                      <Text 
-                        style={[
-                          styles.statusText,
-                          { color: getStatusColor(item.status) }
-                        ]}
-                      >
-                        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Actions */}
-                <View style={styles.transactionActions}>
-                  <Pressable style={styles.downloadButton}>
-                    <Download size={16} color="#374151" />
-                    <Text style={styles.downloadText}>Download Invoice</Text>
-                  </Pressable>
-                  
-                  {item.status === 'pending' && item.due_date && (
-                    <View style={styles.dueDateContainer}>
-                      <Clock size={14} color="#f59e0b" />
-                      <Text style={styles.dueDateText}>
-                        Due {formatDate(item.due_date)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
-        {/* Summary */}
-        <View style={styles.summarySection}>
-          <Text style={styles.summaryTitle}>Summary</Text>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {billingHistory.filter(item => item.status === 'completed').length}
+            <View style={styles.infoCardContent}>
+              <Text style={styles.infoCardTitle}>Automatic Tracking</Text>
+              <Text style={styles.infoCardDescription}>
+                All your transactions will be automatically tracked and categorized.
               </Text>
-              <Text style={styles.summaryLabel}>Completed</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {billingHistory.filter(item => item.status === 'pending').length}
-              </Text>
-              <Text style={styles.summaryLabel}>Pending</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {billingHistory.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
-              </Text>
-              <Text style={styles.summaryLabel}>Total Spent</Text>
             </View>
           </View>
+
+          <View style={styles.infoCard}>
+            <View style={[styles.infoCardIcon, { backgroundColor: '#f0f9ff' }]}>
+              <Download size={24} color="#0ea5e9" />
+            </View>
+            <View style={styles.infoCardContent}>
+              <Text style={styles.infoCardTitle}>Invoice Downloads</Text>
+              <Text style={styles.infoCardDescription}>
+                Download detailed invoices for all your payments and subscriptions.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.infoCard}>
+            <View style={[styles.infoCardIcon, { backgroundColor: '#fdf2f8' }]}>
+              <CreditCard size={24} color="#db2777" />
+            </View>
+            <View style={styles.infoCardContent}>
+              <Text style={styles.infoCardTitle}>Payment Methods</Text>
+              <Text style={styles.infoCardDescription}>
+                View and manage all your saved payment methods in one place.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* What to Expect Section */}
+        <View style={styles.expectationsSection}>
+          <Text style={styles.expectationsTitle}>What to Expect</Text>
+          
+          <View style={styles.expectationItem}>
+            <View style={styles.expectationBullet}>
+              <Text style={styles.expectationBulletText}>•</Text>
+            </View>
+            <View style={styles.expectationContent}>
+              <Text style={styles.expectationItemTitle}>Complete Transaction History</Text>
+              <Text style={styles.expectationItemText}>
+                View all your payments, refunds, and subscription charges in chronological order.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.expectationItem}>
+            <View style={styles.expectationBullet}>
+              <Text style={styles.expectationBulletText}>•</Text>
+            </View>
+            <View style={styles.expectationContent}>
+              <Text style={styles.expectationItemTitle}>Filter & Search</Text>
+              <Text style={styles.expectationItemText}>
+                Easily find specific transactions by date, amount, or status.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.expectationItem}>
+            <View style={styles.expectationBullet}>
+              <Text style={styles.expectationBulletText}>•</Text>
+            </View>
+            <View style={styles.expectationContent}>
+              <Text style={styles.expectationItemTitle}>Export Options</Text>
+              <Text style={styles.expectationItemText}>
+                Export your billing history for accounting or record-keeping purposes.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.expectationItem}>
+            <View style={styles.expectationBullet}>
+              <Text style={styles.expectationBulletText}>•</Text>
+            </View>
+            <View style={styles.expectationContent}>
+              <Text style={styles.expectationItemTitle}>Receipt Management</Text>
+              <Text style={styles.expectationItemText}>
+                Access and download receipts for all your successful payments.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Contact Support */}
+        <View style={styles.supportSection}>
+          <Text style={styles.supportTitle}>Need Help with Billing?</Text>
+          <Text style={styles.supportText}>
+            If you have questions about a recent payment or need billing assistance, our support team is here to help.
+          </Text>
+          <Pressable 
+            style={styles.supportButton}
+            onPress={() => router.push('/help-support')}
+          >
+            <Text style={styles.supportButtonText}>Contact Support</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
@@ -354,8 +282,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -367,197 +298,151 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
   },
-  filterSection: {
+  comingSoonSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  filterTabs: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f9fafb',
+    padding: 24,
+    marginBottom: 20,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  activeFilterTab: {
+  comingSoonIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#fdf2f8',
-    borderColor: '#bd84f6',
-  },
-  filterTabText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  activeFilterTabText: {
-    color: '#bd84f6',
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
-  transactionCard: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 16,
+  comingSoonTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#374151',
+    textAlign: 'center',
     marginBottom: 12,
+  },
+  comingSoonText: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  infoCards: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  transactionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+  infoCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
   },
-  transactionInfo: {
+  infoCardContent: {
     flex: 1,
-    marginRight: 12,
   },
-  transactionDescription: {
+  infoCardTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 4,
   },
-  transactionInvoice: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 2,
-    fontFamily: 'monospace',
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  transactionMethod: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
-  transactionAmount: {
-    alignItems: 'flex-end',
-  },
-  amountText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  transactionActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  downloadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-  },
-  downloadText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  dueDateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#fffbeb',
-    borderRadius: 6,
-  },
-  dueDateText: {
-    fontSize: 12,
-    color: '#f59e0b',
-    fontWeight: '500',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  emptyStateText: {
+  infoCardDescription: {
     fontSize: 14,
     color: '#6b7280',
-    textAlign: 'center',
     lineHeight: 20,
   },
-  summarySection: {
+  expectationsSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  summaryTitle: {
-    fontSize: 16,
+  expectationsTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#374151',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  summaryGrid: {
+  expectationItem: {
     flexDirection: 'row',
-    gap: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
   },
-  summaryItem: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 16,
+  expectationBullet: {
+    width: 24,
     alignItems: 'center',
   },
-  summaryNumber: {
+  expectationBulletText: {
     fontSize: 20,
-    fontWeight: 'bold',
     color: '#bd84f6',
+    fontWeight: 'bold',
+  },
+  expectationContent: {
+    flex: 1,
+  },
+  expectationItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
     marginBottom: 4,
   },
-  summaryLabel: {
-    fontSize: 12,
+  expectationItemText: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  supportSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  supportTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  supportText: {
+    fontSize: 15,
     color: '#6b7280',
     textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  supportButton: {
+    backgroundColor: '#fdf2f8',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bd84f6',
+  },
+  supportButtonText: {
+    color: '#bd84f6',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
