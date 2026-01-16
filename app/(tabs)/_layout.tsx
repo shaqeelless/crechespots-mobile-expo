@@ -1,3 +1,4 @@
+// app/_layout.tsx (TabLayout)
 import { Tabs } from 'expo-router';
 import { Home, Bell, Baby, BookOpen, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -10,17 +11,15 @@ import Animated, {
   Extrapolate,
 } from 'react-native-reanimated';
 import { Pressable, View, Dimensions, Text } from 'react-native';
+import { useNotificationCount } from '@/context/NotificationContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_COUNT = 5;
 const TAB_BAR_WIDTH = SCREEN_WIDTH - 40;
 const TAB_WIDTH = TAB_BAR_WIDTH / TAB_COUNT;
 
-// Add notification context or state management
-import { useNotificationCount } from '@/context/NotificationContext'; // You'll need to create this
-
 // Enhanced Tab Icon with Notification Badge
-const FloatingTabIcon = ({ focused, children, index, onPress, label, notificationCount = 0 }) => {
+const FloatingTabIcon = ({ focused, children, index, onPress, label }) => {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -99,34 +98,6 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label, notificatio
     >
       <Animated.View style={iconAnimatedStyle}>
         {children}
-        
-        {/* Notification Badge */}
-        {notificationCount > 0 && label === 'Notification' && (
-          <View style={{
-            position: 'absolute',
-            top: -6,
-            right: -6,
-            backgroundColor: '#ef4444',
-            borderRadius: 10,
-            minWidth: 18,
-            height: 18,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 2,
-            borderColor: focused ? '#bd84f6' : 'rgba(255, 255, 255, 0.95)',
-            zIndex: 20,
-          }}>
-            <Text style={{
-              color: '#ffffff',
-              fontSize: 10,
-              fontWeight: '700',
-              textAlign: 'center',
-              lineHeight: 12,
-            }}>
-              {notificationCount > 9 ? '9+' : notificationCount}
-            </Text>
-          </View>
-        )}
       </Animated.View>
       
       <Animated.Text
@@ -147,7 +118,7 @@ const FloatingTabIcon = ({ focused, children, index, onPress, label, notificatio
   );
 };
 
-// Fixed Floating Background Indicator (keep this the same)
+// Fixed Floating Background Indicator
 const FloatingBackground = ({ activeIndex }) => {
   const translateX = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -201,13 +172,136 @@ const FloatingBackground = ({ activeIndex }) => {
   );
 };
 
+// Custom Tab Bar with Notification Badge Component
+const NotificationTabIcon = ({ focused, label, notificationCount }) => {
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
+
+  const iconAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateY: translateY.value },
+        { scale: scale.value }
+      ],
+      opacity: opacity.value,
+      zIndex: 10,
+    };
+  });
+
+  const textAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateY: interpolate(
+            translateY.value,
+            [0, -8],
+            [0, -2],
+            Extrapolate.CLAMP
+          ),
+        },
+      ],
+      opacity: interpolate(
+        translateY.value,
+        [0, -8],
+        [0.7, 1],
+        Extrapolate.CLAMP
+      ),
+      color: focused ? '#ffffff' : '#9ca3af',
+    };
+  });
+
+  useEffect(() => {
+    if (focused) {
+      translateY.value = withSpring(-8, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+      scale.value = withSpring(1.2, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+      opacity.value = withTiming(1, { duration: 200 });
+    } else {
+      translateY.value = withSpring(0, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+      scale.value = withSpring(1, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+      opacity.value = withTiming(0.8, { duration: 200 });
+    }
+  }, [focused]);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+        position: 'relative',
+      }}
+    >
+      <Animated.View style={iconAnimatedStyle}>
+        <Bell size={22} color={focused ? '#ffffff' : '#9ca3af'} />
+        
+        {/* Notification Badge */}
+        {notificationCount > 0 && (
+          <View style={{
+            position: 'absolute',
+            top: -8,
+            right: -8,
+            backgroundColor: '#ef4444',
+            borderRadius: 10,
+            minWidth: 18,
+            height: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 2,
+            borderColor: focused ? '#bd84f6' : 'rgba(255, 255, 255, 0.95)',
+            zIndex: 20,
+          }}>
+            <Text style={{
+              color: '#ffffff',
+              fontSize: 10,
+              fontWeight: '700',
+              textAlign: 'center',
+              lineHeight: 12,
+            }}>
+              {notificationCount > 9 ? '9+' : notificationCount}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+      
+      <Animated.Text
+        style={[
+          {
+            fontSize: 11,
+            fontWeight: '600',
+            marginTop: 4,
+            textAlign: 'center',
+          },
+          textAnimatedStyle,
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Animated.Text>
+    </View>
+  );
+};
+
 // Fixed Custom Tab Bar with Notification Support
 const CustomTabBar = ({ state, descriptors, navigation }) => {
-  // You can replace this with actual notification count from your context/API
-  const [notificationCount, setNotificationCount] = useState(3); // Mock data - replace with real data
-  
-  // You could fetch the actual count here or use context
-  // const { unreadCount } = useNotificationCount();
+  const { unreadCount } = useNotificationCount();
 
   return (
     <View
@@ -266,6 +360,28 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           });
         };
 
+        if (label === 'Notification') {
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+              }}
+            >
+              <NotificationTabIcon
+                focused={isFocused}
+                label={label}
+                notificationCount={unreadCount}
+              />
+            </Pressable>
+          );
+        }
+
         const IconComponent = options.tabBarIcon;
 
         return (
@@ -275,7 +391,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             index={index}
             onPress={onPress}
             label={label}
-            notificationCount={label === 'Notification' ? notificationCount : 0}
           >
             <IconComponent
               size={22}
@@ -349,49 +464,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-// Debug version with background
-const DebugFloatingIcon = ({ focused, children, index }) => {
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateY: translateY.value },
-        { scale: scale.value }
-      ],
-      backgroundColor: focused ? '#bd84f6' : 'transparent',
-      padding: focused ? 8 : 0,
-      borderRadius: focused ? 20 : 0,
-    };
-  });
-
-  useEffect(() => {
-    if (focused) {
-      translateY.value = withSpring(-6, {
-        damping: 15,
-        stiffness: 150,
-      });
-      scale.value = withSpring(1.15, {
-        damping: 15,
-        stiffness: 150,
-      });
-    } else {
-      translateY.value = withSpring(0, {
-        damping: 15,
-        stiffness: 150,
-      });
-      scale.value = withSpring(1, {
-        damping: 15,
-        stiffness: 150,
-      });
-    }
-  }, [focused]);
-
-  return (
-    <Animated.View style={animatedStyle}>
-      {children}
-    </Animated.View>
-  );
-};

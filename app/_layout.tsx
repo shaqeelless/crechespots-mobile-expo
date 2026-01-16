@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { NotificationProvider } from '@/context/NotificationContext'; // Add this import
 
 function LayoutContent() {
   useFrameworkReady();
@@ -60,8 +61,10 @@ function LayoutContent() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <LayoutContent />
-      <StatusBar style="auto" />
+      <NotificationProvider> {/* Wrap with NotificationProvider */}
+        <LayoutContent />
+        <StatusBar style="auto" />
+      </NotificationProvider>
     </AuthProvider>
   );
 }
