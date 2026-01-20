@@ -9,6 +9,7 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -27,6 +28,9 @@ import {
   Home,
   Edit,
   Trash2,
+  Check,
+  X,
+  MailCheck,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +38,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface Application {
   id: string;
   application_status: string;
+  offer_response: string | null;
   created_at: string;
   submitted_at: string;
   parent_name: string;
@@ -75,6 +80,8 @@ export default function ApplicationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [respondingToOffer, setRespondingToOffer] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -105,6 +112,61 @@ export default function ApplicationDetailScreen() {
     }
   };
 
+  const handleOfferResponse = async (response: 'ACCEPTED' | 'REJECTED') => {
+    try {
+      setRespondingToOffer(true);
+      
+      const { error } = await supabase
+        .from('applications')
+        .update({ 
+          offer_response: response,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      // Update local state
+      setApplication(prev => prev ? { ...prev, offer_response: response } : null);
+      
+      Alert.alert(
+        'Success', 
+        `You have ${response.toLowerCase()} the offer`,
+        [
+          {
+            text: 'OK',
+            onPress: () => setShowOfferModal(false)
+          }
+        ]
+      );
+      
+      // If accepted, update the application status to Approved
+      if (response === 'ACCEPTED') {
+        const { error: statusError } = await supabase
+          .from('applications')
+          .update({ 
+            application_status: 'Approved',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (!statusError) {
+          setApplication(prev => prev ? { 
+            ...prev, 
+            offer_response: response,
+            application_status: 'Approved'
+          } : null);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error responding to offer:', error);
+      Alert.alert('Error', 'Failed to submit your response');
+    } finally {
+      setRespondingToOffer(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'approved':
@@ -113,6 +175,8 @@ export default function ApplicationDetailScreen() {
       case 'declined':
       case 'rejected':
         return <XCircle size={24} color="#ef4444" />;
+      case 'offer made':
+        return <MailCheck size={24} color="#8b5cf6" />;
       case 'pending':
       case 'new':
         return <Clock size={24} color="#f59e0b" />;
@@ -129,6 +193,8 @@ export default function ApplicationDetailScreen() {
       case 'declined':
       case 'rejected':
         return '#ef4444';
+      case 'offer made':
+        return '#8b5cf6';
       case 'pending':
       case 'new':
         return '#f59e0b';
@@ -145,11 +211,39 @@ export default function ApplicationDetailScreen() {
       case 'declined':
       case 'rejected':
         return '#fef2f2';
+      case 'offer made':
+        return '#f5f3ff';
       case 'pending':
       case 'new':
         return '#fefce8';
       default:
         return '#f3f4f6';
+    }
+  };
+
+  const getOfferResponseColor = (response: string | null) => {
+    switch (response?.toUpperCase()) {
+      case 'ACCEPTED':
+        return '#22c55e';
+      case 'REJECTED':
+        return '#ef4444';
+      case 'PENDING':
+        return '#f59e0b';
+      default:
+        return '#6b7280';
+    }
+  };
+
+  const getOfferResponseText = (response: string | null) => {
+    switch (response?.toUpperCase()) {
+      case 'ACCEPTED':
+        return 'Accepted';
+      case 'REJECTED':
+        return 'Rejected';
+      case 'PENDING':
+        return 'Response Pending';
+      default:
+        return 'No Response';
     }
   };
 
@@ -222,7 +316,7 @@ export default function ApplicationDetailScreen() {
               if (error) throw error;
               
               Alert.alert('Success', 'Application withdrawn successfully');
-              fetchApplication(); // Refresh data
+              fetchApplication();
             } catch (error) {
               console.error('Error withdrawing application:', error);
               Alert.alert('Error', 'Failed to withdraw application');
@@ -335,7 +429,39 @@ export default function ApplicationDetailScreen() {
               </Text>
             </View>
           </View>
+          
+          {/* Offer Response Status */}
+          {application.application_status?.toLowerCase() === 'offer made' && (
+            <View style={styles.offerResponseContainer}>
+              <Text style={[
+                styles.offerResponseText,
+                { color: getOfferResponseColor(application.offer_response) }
+              ]}>
+                {getOfferResponseText(application.offer_response)}
+              </Text>
+            </View>
+          )}
         </View>
+
+        {/* Offer Response Action */}
+        {application.application_status?.toLowerCase() === 'offer made' && 
+         !application.offer_response && (
+          <View style={styles.offerActionSection}>
+            <Text style={styles.offerActionTitle}>
+              🎉 Congratulations! You've received an offer from {application.creches?.name}
+            </Text>
+            <Text style={styles.offerActionDescription}>
+              Please respond to this offer within 7 days to secure your spot.
+            </Text>
+            <Pressable 
+              style={styles.offerActionButton}
+              onPress={() => setShowOfferModal(true)}
+            >
+              <MailCheck size={20} color="#ffffff" />
+              <Text style={styles.offerActionButtonText}>Respond to Offer</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Creche Information */}
         <View style={styles.section}>
@@ -441,7 +567,7 @@ export default function ApplicationDetailScreen() {
                 <Home size={18} color="#374151" />
                 <Text style={styles.infoLabel}>Address:</Text>
                 <Text style={styles.infoValue}>{application.parent_address}</Text>
-              </View>
+            </View>
             )}
           </View>
         </View>
@@ -477,6 +603,18 @@ export default function ApplicationDetailScreen() {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Lifecycle Stage:</Text>
                 <Text style={styles.infoValue}>{application.lifecycle_stage}</Text>
+              </View>
+            )}
+            {application.offer_response && (
+              <View style={styles.infoRow}>
+                <MailCheck size={18} color="#374151" />
+                <Text style={styles.infoLabel}>Offer Response:</Text>
+                <Text style={[
+                  styles.infoValue,
+                  { color: getOfferResponseColor(application.offer_response) }
+                ]}>
+                  {getOfferResponseText(application.offer_response)}
+                </Text>
               </View>
             )}
           </View>
@@ -568,6 +706,70 @@ export default function ApplicationDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Offer Response Modal */}
+      <Modal
+        visible={showOfferModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowOfferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Respond to Offer</Text>
+              <Pressable 
+                style={styles.modalCloseButton}
+                onPress={() => setShowOfferModal(false)}
+              >
+                <X size={24} color="#374151" />
+              </Pressable>
+            </View>
+            
+            <Text style={styles.modalDescription}>
+              You have received an offer from {application.creches?.name}. 
+              Please select your response below:
+            </Text>
+            
+            <View style={styles.modalButtonsContainer}>
+              <Pressable 
+                style={[styles.modalButton, styles.acceptButton]}
+                onPress={() => handleOfferResponse('ACCEPTED')}
+                disabled={respondingToOffer}
+              >
+                {respondingToOffer ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Check size={20} color="#ffffff" />
+                )}
+                <Text style={styles.modalButtonText}>
+                  {respondingToOffer ? 'Processing...' : 'Accept Offer'}
+                </Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.modalButton, styles.rejectButton]}
+                onPress={() => handleOfferResponse('REJECTED')}
+                disabled={respondingToOffer}
+              >
+                {respondingToOffer ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <X size={20} color="#ffffff" />
+                )}
+                <Text style={styles.modalButtonText}>
+                  {respondingToOffer ? 'Processing...' : 'Decline Offer'}
+                </Text>
+              </Pressable>
+            </View>
+            
+            <Text style={styles.modalNote}>
+              Note: If you accept, your application status will change to "Approved" 
+              and the creche will contact you with next steps.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -661,6 +863,7 @@ const styles = StyleSheet.create({
   },
   statusTextContainer: {
     marginLeft: 12,
+    flex: 1,
   },
   statusLabel: {
     fontSize: 14,
@@ -671,6 +874,49 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     textTransform: 'capitalize',
+  },
+  offerResponseContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  offerResponseText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  offerActionSection: {
+    backgroundColor: '#f5f3ff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  offerActionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#8b5cf6',
+    marginBottom: 8,
+  },
+  offerActionDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  offerActionButton: {
+    backgroundColor: '#8b5cf6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  offerActionButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
@@ -820,5 +1066,69 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: '#6b7280',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  modalButtonsContainer: {
+    gap: 12,
+  },
+  modalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 12,
+  },
+  acceptButton: {
+    backgroundColor: '#22c55e',
+  },
+  rejectButton: {
+    backgroundColor: '#ef4444',
+  },
+  modalButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalNote: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 16,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
 });

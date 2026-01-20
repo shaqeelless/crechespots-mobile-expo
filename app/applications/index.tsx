@@ -6,11 +6,21 @@ import {
   ScrollView,
   Pressable,
   Image,
+  RefreshControl,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Clock, CircleCheck as CheckCircle, Circle as XCircle, CircleAlert as AlertCircle, FileText, Calendar } from 'lucide-react-native';
+import { 
+  ArrowLeft, 
+  Clock, 
+  CircleCheck as CheckCircle, 
+  Circle as XCircle, 
+  CircleAlert as AlertCircle, 
+  FileText, 
+  Calendar 
+} from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Application {
   id: string;
@@ -20,6 +30,7 @@ interface Application {
   parent_phone_number: string;
   parent_email: string;
   message: string;
+  user_id: string;
   creches: {
     name: string;
     header_image: string;
@@ -34,17 +45,41 @@ interface Application {
 
 export default function ApplicationsScreen() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    fetchApplications();
-  }, []);
+    if (!authLoading && user?.id) {
+      fetchApplications();
+    } else if (!authLoading && !user) {
+      // User is not logged in, redirect to login
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to view your applications',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => router.push('/login'),
+          },
+        ]
+      );
+    }
+  }, [user, authLoading]);
 
   const fetchApplications = async () => {
     try {
+      if (!user?.id) {
+        console.log('No user ID found');
+        setApplications([]);
+        return;
+      }
+
       setLoading(true);
+      
+      console.log('Fetching applications for user:', user.id);
+      
       const { data, error } = await supabase
         .from('applications')
         .select(`
@@ -52,13 +87,19 @@ export default function ApplicationsScreen() {
           creches(name, header_image, address),
           children(first_name, last_name, date_of_birth)
         `)
+        .eq('user_id', user.id) // Filter by current user ID
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Applications fetched:', data?.length || 0);
       setApplications(data || []);
-    } catch (error) {
-      console.error('Error fetching applications:', error);
-      Alert.alert('Error', 'Failed to load applications');
+    } catch (error: any) {
+      console.error('Error fetching applications:', error.message || error);
+      Alert.alert('Error', 'Failed to load applications. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -96,6 +137,17 @@ export default function ApplicationsScreen() {
     }
   };
 
+  const getStatusText = (status: string) => {
+    if (!status) return 'Pending';
+    
+    const statusLower = status.toLowerCase();
+    if (statusLower === 'approved' || statusLower === 'accepted') return 'Approved';
+    if (statusLower === 'declined' || statusLower === 'rejected') return 'Declined';
+    if (statusLower === 'pending' || statusLower === 'new') return 'Pending';
+    
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
   const filteredApplications = applications.filter(app => {
     if (filter === 'all') return true;
     return app.application_status?.toLowerCase() === filter;
@@ -109,16 +161,24 @@ export default function ApplicationsScreen() {
     >
       <View style={styles.cardHeader}>
         <Image 
-          source={{ uri: application.creches?.header_image || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }} 
+          source={{ 
+            uri: application.creches?.header_image || 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' 
+          }} 
           style={styles.crecheImage} 
+          defaultSource={{ uri: 'https://crechespots.co.za/wp-content/uploads/2025/09/cropped-cropped-brand.png' }}
         />
         <View style={styles.headerInfo}>
-          <Text style={styles.crecheName}>{application.creches?.name}</Text>
+          <Text style={styles.crecheName}>
+            {application.creches?.name || 'Unknown Creche'}
+          </Text>
           <Text style={styles.childName}>
-            For: {application.children?.first_name} {application.children?.last_name}
+            For: {application.children?.first_name || ''} {application.children?.last_name || ''}
           </Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(application.application_status) }]}>
+        <View style={[
+          styles.statusBadge, 
+          { backgroundColor: `${getStatusColor(application.application_status)}20` }
+        ]}>
           {getStatusIcon(application.application_status)}
         </View>
       </View>
@@ -127,25 +187,79 @@ export default function ApplicationsScreen() {
         <View style={styles.statusRow}>
           <Text style={styles.statusLabel}>Status:</Text>
           <Text style={[styles.statusText, { color: getStatusColor(application.application_status) }]}>
-            {application.application_status || 'Pending'}
+            {getStatusText(application.application_status)}
           </Text>
         </View>
 
         <View style={styles.dateRow}>
           <Calendar size={14} color="#6b7280" />
           <Text style={styles.dateText}>
-            Applied: {new Date(application.created_at).toLocaleDateString()}
+            Applied: {new Date(application.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })}
           </Text>
         </View>
 
         {application.message && (
-          <Text style={styles.messagePreview} numberOfLines={2}>
-            "{application.message}"
-          </Text>
+          <View style={styles.messageContainer}>
+            <Text style={styles.messagePreview} numberOfLines={2}>
+              "{application.message}"
+            </Text>
+          </View>
         )}
       </View>
     </Pressable>
   );
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#374151" />
+          </Pressable>
+          <Text style={styles.headerTitle}>My Applications</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Show message if user is not logged in
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#374151" />
+          </Pressable>
+          <Text style={styles.headerTitle}>My Applications</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <AlertCircle size={48} color="#d1d5db" />
+          </View>
+          <Text style={styles.emptyTitle}>Authentication Required</Text>
+          <Text style={styles.emptyDescription}>
+            Please log in to view your applications
+          </Text>
+          <Pressable 
+            style={styles.exploreButton}
+            onPress={() => router.push('/login')}
+          >
+            <Text style={styles.exploreButtonText}>Go to Login</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -190,7 +304,18 @@ export default function ApplicationsScreen() {
         </ScrollView>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading && !authLoading}
+            onRefresh={fetchApplications}
+            colors={['#bd84f6']}
+            tintColor="#bd84f6"
+          />
+        }
+      >
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading applications...</Text>
@@ -304,6 +429,7 @@ const styles = StyleSheet.create({
   },
   applicationsContainer: {
     gap: 16,
+    paddingBottom: 20,
   },
   applicationCard: {
     backgroundColor: '#ffffff',
@@ -325,6 +451,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 12,
+    backgroundColor: '#f3f4f6',
   },
   headerInfo: {
     flex: 1,
@@ -345,6 +472,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   cardContent: {
     gap: 8,
@@ -371,6 +500,9 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  messageContainer: {
+    marginTop: 4,
   },
   messagePreview: {
     fontSize: 14,
