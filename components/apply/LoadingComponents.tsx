@@ -12,18 +12,6 @@ const SkeletonLoading = () => {
       </View>
 
       {/* Progress Steps Skeleton */}
-      <View style={styles.skeletonProgressContainer}>
-        {[1, 2, 3, 4].map((item) => (
-          <View key={item} style={styles.skeletonProgressStep}>
-            <View style={styles.skeletonProgressIcon} />
-            <View style={styles.skeletonProgressText}>
-              <View style={styles.skeletonProgressTitle} />
-              <View style={styles.skeletonProgressDescription} />
-            </View>
-            {item < 4 && <View style={styles.skeletonProgressLine} />}
-          </View>
-        ))}
-      </View>
 
       {/* Main Content Skeleton */}
       <View style={styles.skeletonContent}>

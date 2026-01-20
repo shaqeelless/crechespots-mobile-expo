@@ -203,6 +203,10 @@ export const useApplicationData = (crecheId: string) => {
     try {
       setSubmitting(true);
 
+      // Get child and class details before submission for the success screen
+      const child = children.find(c => c.id === selectedChild);
+      const crecheClass = classes.find(cls => cls.id === selectedClass);
+
       const applicationData = {
         creche_id: crecheId,
         child_id: selectedChild,
@@ -253,20 +257,16 @@ export const useApplicationData = (crecheId: string) => {
         [selectedChild]: newExistingApp
       }));
 
-      Alert.alert(
-        'Application Submitted!',
-        'Your application has been sent to the creche. They will review it and get back to you soon.',
-        [
-          {
-            text: 'View Applications',
-            onPress: () => router.push('/applications'),
-          },
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      // Navigate to CompleteApplication screen with animation
+      router.replace({
+        pathname: '/CompleteApplicationScreen',
+        params: {
+          crecheName: creche?.name || '',
+          childName: `${child?.first_name || ''} ${child?.last_name || ''}`.trim(),
+          className: crecheClass?.name || '',
+          crecheId: crecheId,
+        }
+      });
 
     } catch (error: any) {
       console.error('Error submitting application:', error);

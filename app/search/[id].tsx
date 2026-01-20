@@ -33,6 +33,9 @@ import {
   Heart,
   ChevronRight,
   ChevronLeft as LeftIcon,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -74,6 +77,18 @@ interface GalleryImage {
   created_at: string;
 }
 
+interface CrecheClass {
+  id: string;
+  creche_id: string;
+  name: string;
+  color: string;
+  capacity: number;
+  min_age_months: number;
+  max_age_months: number;
+  current_enrollment?: number;
+  has_capacity?: boolean;
+}
+
 // Skeleton Loading Component
 const SkeletonLoader = () => {
   return (
@@ -105,6 +120,12 @@ const SkeletonLoader = () => {
           <View style={styles.skeletonRatingRow} />
         </View>
 
+        {/* Capacity Status Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonCapacityStatus} />
+          <View style={styles.skeletonCapacityInfo} />
+        </View>
+
         {/* Pricing Skeleton */}
         <View style={styles.section}>
           <View style={styles.skeletonSectionTitle} />
@@ -121,6 +142,15 @@ const SkeletonLoader = () => {
             <View style={styles.skeletonDescriptionLine} />
             <View style={styles.skeletonDescriptionLine} />
             <View style={styles.skeletonDescriptionLineShort} />
+          </View>
+        </View>
+
+        {/* Classes Skeleton */}
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonClassesContainer}>
+            <View style={styles.skeletonClassCard} />
+            <View style={styles.skeletonClassCard} />
           </View>
         </View>
 
@@ -287,6 +317,7 @@ export default function CrecheDetailScreen() {
   const { user } = useAuth();
   const [creche, setCreche] = useState<Creche | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  const [crecheClasses, setCrecheClasses] = useState<CrecheClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -330,9 +361,51 @@ export default function CrecheDetailScreen() {
       }
 
       setCreche(data);
+      
+      // Fetch creche classes after loading creche details
+      await fetchCrecheClasses(data.id);
     } catch (err) {
       console.error('Error fetching creche details:', err);
       setError('Failed to load creche details');
+    }
+  };
+
+  const fetchCrecheClasses = async (crecheId: string) => {
+    try {
+      // Fetch creche classes
+      const { data: classesData, error: classesError } = await supabase
+        .from('creche_classes')
+        .select('*')
+        .eq('creche_id', crecheId)
+        .order('min_age_months', { ascending: true });
+
+      if (classesError) throw classesError;
+
+      if (classesData && classesData.length > 0) {
+        // Get current enrollment for each class
+        const classesWithEnrollment = await Promise.all(
+          classesData.map(async (classItem) => {
+            const { count } = await supabase
+              .from('students')
+              .select('*', { count: 'exact', head: true })
+              .eq('class_id', classItem.id)
+              .eq('status', 'active');
+
+            return {
+              ...classItem,
+              current_enrollment: count || 0,
+              has_capacity: (count || 0) < classItem.capacity
+            };
+          })
+        );
+
+        setCrecheClasses(classesWithEnrollment);
+      } else {
+        setCrecheClasses([]);
+      }
+    } catch (error) {
+      console.error('Error fetching creche classes:', error);
+      setCrecheClasses([]);
     }
   };
 
@@ -444,6 +517,189 @@ export default function CrecheDetailScreen() {
     router.push(`/apply/${creche?.id}`);
   };
 
+  // Function to check if creche has available classes
+  const hasAvailableClasses = () => {
+    return crecheClasses.some(classItem => classItem.has_capacity);
+  };
+
+  // Function to get capacity status
+  const getCapacityStatus = () => {
+    if (crecheClasses.length === 0) {
+      return {
+        hasClasses: false,
+        hasCapacity: false,
+        text: 'No classes defined',
+        color: '#6b7280',
+        icon: AlertCircle,
+        availableSpots: 0,
+        totalCapacity: 0,
+        totalEnrollment: 0
+      };
+    }
+
+    const availableClasses = crecheClasses.filter(c => c.has_capacity);
+    const totalCapacity = crecheClasses.reduce((sum, c) => sum + c.capacity, 0);
+    const totalEnrollment = crecheClasses.reduce((sum, c) => sum + (c.current_enrollment || 0), 0);
+    const availableSpots = totalCapacity - totalEnrollment;
+    const capacityPercentage = totalCapacity > 0 ? (totalEnrollment / totalCapacity) * 100 : 0;
+
+    if (availableClasses.length > 0) {
+      if (capacityPercentage >= 90) {
+        return {
+          hasClasses: true,
+          hasCapacity: true,
+          text: 'Limited Spots Available',
+          color: '#f59e0b',
+          icon: AlertCircle,
+          availableSpots,
+          totalCapacity,
+          totalEnrollment
+        };
+      } else if (capacityPercentage >= 75) {
+        return {
+          hasClasses: true,
+          hasCapacity: true,
+          text: 'Some Spots Available',
+          color: '#f59e0b',
+          icon: AlertCircle,
+          availableSpots,
+          totalCapacity,
+          totalEnrollment
+        };
+      } else {
+        return {
+          hasClasses: true,
+          hasCapacity: true,
+          text: 'Spots Available',
+          color: '#22c55e',
+          icon: CheckCircle,
+          availableSpots,
+          totalCapacity,
+          totalEnrollment
+        };
+      }
+    } else {
+      return {
+        hasClasses: true,
+        hasCapacity: false,
+        text: 'Join Waitlist',
+        color: '#ef4444',
+        icon: XCircle,
+        availableSpots: 0,
+        totalCapacity,
+        totalEnrollment
+      };
+    }
+  };
+
+  // Function to get button text based on capacity
+  const getApplyButtonText = () => {
+    const status = getCapacityStatus();
+    
+    if (!status.hasClasses) {
+      return 'Contact Creche';
+    } else if (status.hasCapacity) {
+      return 'Apply Now';
+    } else {
+      return 'Join Waitlist';
+    }
+  };
+
+  // Function to get button color based on capacity
+  const getApplyButtonStyle = () => {
+    const status = getCapacityStatus();
+    
+    if (!status.hasClasses) {
+      return styles.contactButton;
+    } else if (status.hasCapacity) {
+      return styles.applyNowButton;
+    } else {
+      return styles.waitlistButton;
+    }
+  };
+
+  const renderClassCard = (classItem: CrecheClass, index: number) => {
+    const capacityPercentage = classItem.current_enrollment 
+      ? (classItem.current_enrollment / classItem.capacity) * 100 
+      : 0;
+    
+    const getCapacityColor = (percentage: number, hasCapacity: boolean) => {
+      if (!hasCapacity) return '#ef4444';
+      if (percentage >= 90) return '#f59e0b';
+      if (percentage >= 75) return '#f59e0b';
+      return '#10b981';
+    };
+
+    return (
+      <View key={classItem.id} style={styles.classCard}>
+        <View style={styles.classHeader}>
+          <View style={[styles.classColor, { backgroundColor: classItem.color }]} />
+          <Text style={styles.className}>{classItem.name}</Text>
+          <View style={[
+            styles.classStatus,
+            { backgroundColor: classItem.has_capacity ? '#10b98115' : '#ef444415' }
+          ]}>
+            {classItem.has_capacity ? (
+              <>
+                <CheckCircle size={12} color="#10b981" />
+                <Text style={[styles.classStatusText, { color: '#10b981' }]}>
+                  Available
+                </Text>
+              </>
+            ) : (
+              <>
+                <XCircle size={12} color="#ef4444" />
+                <Text style={[styles.classStatusText, { color: '#ef4444' }]}>
+                  Full
+                </Text>
+              </>
+            )}
+          </View>
+        </View>
+        
+        <View style={styles.classDetails}>
+          <View style={styles.classDetailRow}>
+            <Clock size={12} color="#6b7280" />
+            <Text style={styles.classDetailText}>
+              Age: {classItem.min_age_months} - {classItem.max_age_months} months
+            </Text>
+          </View>
+          
+          <View style={styles.classDetailRow}>
+            <Users size={12} color="#6b7280" />
+            <Text style={styles.classDetailText}>
+              Spots: {classItem.current_enrollment || 0}/{classItem.capacity}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.capacityContainer}>
+          <View style={styles.capacityBar}>
+            <View 
+              style={[
+                styles.capacityFill,
+                { 
+                  width: `${Math.min(capacityPercentage, 100)}%`,
+                  backgroundColor: getCapacityColor(capacityPercentage, classItem.has_capacity || false)
+                }
+              ]} 
+            />
+          </View>
+          <Text style={[
+            styles.capacityText,
+            { color: getCapacityColor(capacityPercentage, classItem.has_capacity || false) }
+          ]}>
+            {classItem.has_capacity 
+              ? (capacityPercentage >= 90 ? 'Limited' : 
+                 capacityPercentage >= 75 ? 'Limited Spots' : 
+                 'Available')
+              : 'Full'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   if (loading) {
     return <SkeletonLoader />;
   }
@@ -462,6 +718,8 @@ export default function CrecheDetailScreen() {
       </View>
     );
   }
+
+  const capacityStatus = getCapacityStatus();
 
   return (
     <View style={styles.container}>
@@ -521,6 +779,24 @@ export default function CrecheDetailScreen() {
           </View>
         </View>
 
+        {/* Capacity Status */}
+        {crecheClasses.length > 0 && (
+          <View style={styles.section}>
+            <View style={[styles.capacityStatusContainer, { backgroundColor: `${capacityStatus.color}15` }]}>
+              <View style={styles.capacityStatusHeader}>
+                <View style={[styles.capacityStatusIcon, { backgroundColor: capacityStatus.color }]}>
+                  {React.createElement(capacityStatus.icon, { size: 16, color: '#ffffff' })}
+                </View>
+                <Text style={[styles.capacityStatusTitle, { color: capacityStatus.color }]}>
+                  {capacityStatus.text}
+                </Text>
+              </View>
+              
+
+            </View>
+          </View>
+        )}
+
         {/* Pricing */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pricing</Text>
@@ -530,12 +806,7 @@ export default function CrecheDetailScreen() {
                creche.weekly_price ? `R${creche.weekly_price}/week` : 
                creche.price ? `R${creche.price}/day` : 'Contact for pricing'}
             </Text>
-            {creche.capacity && (
-              <View style={styles.capacity}>
-                <Users size={14} color="#6b7280" />
-                <Text style={styles.capacityText}>Capacity: {creche.capacity}</Text>
-              </View>
-            )}
+
           </View>
         </View>
 
@@ -546,6 +817,8 @@ export default function CrecheDetailScreen() {
             <Text style={styles.description}>{creche.description}</Text>
           </View>
         )}
+
+
 
         {/* Gallery Info */}
         {galleryImages.length > 0 && (
@@ -687,10 +960,10 @@ export default function CrecheDetailScreen() {
         </Pressable>
 
         <Pressable 
-          style={styles.applyButton} 
+          style={[styles.applyButton, getApplyButtonStyle()]} 
           onPress={handleApplyNow}
         >
-          <Text style={styles.applyButtonText}>Apply Now</Text>
+          <Text style={styles.applyButtonText}>{getApplyButtonText()}</Text>
           <Send size={16} color="#ffffff" />
         </Pressable>
       </View>
@@ -784,7 +1057,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-
+    height: 100,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
@@ -882,7 +1155,70 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#374151',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  // Capacity Status Styles
+  capacityStatusContainer: {
+    borderRadius: 12,
+    padding: 16,
+  },
+  capacityStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  capacityStatusIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  capacityStatusTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  capacityStats: {
+    gap: 8,
+  },
+  capacityStat: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  capacityStatLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  capacityStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  availableSpots: {
+    color: '#22c55e',
+  },
+  noSpots: {
+    color: '#ef4444',
+  },
+  capacityProgress: {
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  capacityProgressFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   pricingRow: {
     flexDirection: 'row',
@@ -907,6 +1243,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     lineHeight: 24,
+  },
+  // Classes Styles
+  classesContainer: {
+    gap: 12,
+  },
+  classCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  classHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  classColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  className: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    flex: 1,
+  },
+  classStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  classStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  classDetails: {
+    marginBottom: 12,
+  },
+  classDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  classDetailText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginLeft: 8,
+  },
+  capacityContainer: {
+    marginTop: 8,
+  },
+  capacityBar: {
+    height: 6,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  capacityFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  capacityText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
   },
   hoursRow: {
     flexDirection: 'row',
@@ -1001,7 +1409,6 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     flex: 2,
-    backgroundColor: '#bd84f6',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -1013,6 +1420,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+  },
+  applyNowButton: {
+    backgroundColor: '#bd84f6',
+  },
+  waitlistButton: {
+    backgroundColor: '#f59e0b',
+  },
+  contactButton: {
+    backgroundColor: '#6b7280',
   },
   applyButtonText: {
     fontSize: 16,
@@ -1127,6 +1543,17 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     width: '40%',
   },
+  skeletonCapacityStatus: {
+    height: 60,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  skeletonCapacityInfo: {
+    height: 40,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+  },
   skeletonSectionTitle: {
     height: 20,
     backgroundColor: '#e5e7eb',
@@ -1165,6 +1592,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
     borderRadius: 4,
     width: '60%',
+  },
+  skeletonClassesContainer: {
+    gap: 12,
+  },
+  skeletonClassCard: {
+    height: 80,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
   },
   skeletonHoursRow: {
     height: 16,

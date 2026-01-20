@@ -450,34 +450,6 @@ export default function SearchScreen() {
             ))}
           </View>
 
-          {/* Capacity Info */}
-          {hasClasses && (
-            <View style={styles.capacityInfoContainer}>
-              <View style={styles.capacityRow}>
-                <Text style={styles.capacityLabel}>Total Spots:</Text>
-                <Text style={styles.capacityValue}>{totalCapacity}</Text>
-              </View>
-              <View style={styles.capacityRow}>
-                <Text style={styles.capacityLabel}>Available:</Text>
-                <Text style={[styles.capacityValue, availableSpots > 0 ? styles.availableSpots : styles.noSpots]}>
-                  {availableSpots > 0 ? `${availableSpots} spots` : 'Full'}
-                </Text>
-              </View>
-              {availableSpots > 0 && (
-                <View style={styles.capacityProgress}>
-                  <View 
-                    style={[
-                      styles.capacityProgressFill,
-                      { 
-                        width: `${Math.min((totalEnrollment / totalCapacity) * 100, 100)}%`,
-                        backgroundColor: availableSpots > 0 ? '#22c55e' : '#ef4444'
-                      }
-                    ]} 
-                  />
-                </View>
-              )}
-            </View>
-          )}
           
           <View style={styles.resultFooter}>
             <View style={styles.priceContainer}>
