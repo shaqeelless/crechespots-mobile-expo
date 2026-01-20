@@ -355,8 +355,8 @@ export default function SettingsScreen() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appVersion}>CrecheSpots v1.0.1</Text>
-          <Text style={styles.appCopyright}>© 2024 CrecheSpots. All rights reserved.</Text>
+          <Text style={styles.appVersion}>CrecheSpots v1.5.1</Text>
+          <Text style={styles.appCopyright}>© 2026 CrecheSpots. All rights reserved.</Text>
         </View>
 
         {/* Sign Out */}

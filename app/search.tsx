@@ -10,7 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Search, MapPin, Star, Filter, SlidersHorizontal, X, Heart, Bookmark, ArrowLeft } from 'lucide-react-native';
+import { Search, MapPin, Star, Filter, SlidersHorizontal, X, Bookmark, ArrowLeft } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,6 +77,7 @@ export default function SearchScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoritesLoading, setFavoritesLoading] = useState<Set<string>>(new Set());
+  const [crecheClassesData, setCrecheClassesData] = useState<Record<string, any[]>>({});
   const router = useRouter();
   const { user } = useAuth();
 
@@ -108,11 +109,72 @@ export default function SearchScreen() {
 
       setCreches(data || []);
       setFilteredCreches(data || []);
+      
+      // Fetch classes for each creche to check capacity
+      await fetchCrecheClassesData(data || []);
     } catch (err) {
       console.error('Error fetching creches:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCrecheClassesData = async (crechesData: any[]) => {
+    try {
+      const classData: Record<string, any[]> = {};
+      
+      // Fetch classes for all creches
+      const { data: classesData, error: classesError } = await supabase
+        .from('creche_classes')
+        .select('*')
+        .in('creche_id', crechesData.map(c => c.id));
+
+      if (classesError) throw classesError;
+
+      // Organize classes by creche_id
+      if (classesData) {
+        classesData.forEach(classItem => {
+          if (!classData[classItem.creche_id]) {
+            classData[classItem.creche_id] = [];
+          }
+          classData[classItem.creche_id].push(classItem);
+        });
+      }
+
+      // Fetch current enrollment for each class
+      const classesWithEnrollment = await Promise.all(
+        Object.keys(classData).map(async (crecheId) => {
+          const classes = classData[crecheId];
+          const classesWithEnrollmentData = await Promise.all(
+            classes.map(async (classItem) => {
+              const { count } = await supabase
+                .from('students')
+                .select('*', { count: 'exact', head: true })
+                .eq('class_id', classItem.id)
+                .eq('status', 'active');
+
+              return {
+                ...classItem,
+                current_enrollment: count || 0,
+                has_capacity: (count || 0) < classItem.capacity
+              };
+            })
+          );
+          
+          return { crecheId, classes: classesWithEnrollmentData };
+        })
+      );
+
+      // Update class data with enrollment info
+      const updatedClassData: Record<string, any[]> = {};
+      classesWithEnrollment.forEach(item => {
+        updatedClassData[item.crecheId] = item.classes;
+      });
+
+      setCrecheClassesData(updatedClassData);
+    } catch (error) {
+      console.error('Error fetching creche classes data:', error);
     }
   };
 
@@ -214,7 +276,11 @@ export default function SearchScreen() {
     // Apply active filter
     switch (activeFilter) {
       case 'available':
-        filtered = filtered.filter(creche => creche.applications === true);
+        // Filter for creches that have at least one class with capacity
+        filtered = filtered.filter(creche => {
+          const classes = crecheClassesData[creche.id] || [];
+          return classes.some(classItem => classItem.has_capacity);
+        });
         break;
       case 'budget':
         // Filter for creches with monthly price under R2000
@@ -254,9 +320,50 @@ export default function SearchScreen() {
     router.back();
   };
 
+  // Function to check if a creche has any available classes
+  const hasAvailableClasses = (crecheId: string) => {
+    const classes = crecheClassesData[crecheId] || [];
+    return classes.some(classItem => classItem.has_capacity);
+  };
+
+  // Function to get capacity status text and color
+  const getCapacityStatus = (crecheId: string) => {
+    const classes = crecheClassesData[crecheId] || [];
+    
+    if (classes.length === 0) {
+      return { text: 'Contact for info', color: '#6b7280' };
+    }
+    
+    const availableClasses = classes.filter(c => c.has_capacity);
+    const totalCapacity = classes.reduce((sum, c) => sum + c.capacity, 0);
+    const totalEnrollment = classes.reduce((sum, c) => sum + (c.current_enrollment || 0), 0);
+    const capacityPercentage = totalCapacity > 0 ? (totalEnrollment / totalCapacity) * 100 : 0;
+    
+    if (availableClasses.length > 0) {
+      if (capacityPercentage >= 90) {
+        return { text: 'Limited Spots Available', color: '#f59e0b' };
+      } else if (capacityPercentage >= 75) {
+        return { text: 'Some Spots Available', color: '#f59e0b' };
+      } else {
+        return { text: 'Spots Available', color: '#22c55e' };
+      }
+    } else {
+      return { text: 'Join Waitlist', color: '#ef4444' };
+    }
+  };
+
   const renderSearchResult = (result: any) => {
     const isFavorite = favorites.has(result.id);
     const isFavoriteLoading = favoritesLoading.has(result.id);
+    const hasClasses = crecheClassesData[result.id] && crecheClassesData[result.id].length > 0;
+    const availableClasses = hasAvailableClasses(result.id);
+    const capacityStatus = getCapacityStatus(result.id);
+    
+    // Calculate total capacity for this creche
+    const classes = crecheClassesData[result.id] || [];
+    const totalCapacity = classes.reduce((sum, c) => sum + c.capacity, 0);
+    const totalEnrollment = classes.reduce((sum, c) => sum + (c.current_enrollment || 0), 0);
+    const availableSpots = totalCapacity - totalEnrollment;
 
     return (
       <Pressable 
@@ -293,6 +400,15 @@ export default function SearchScreen() {
           {isFavorite && !isFavoriteLoading && (
             <View style={styles.savedBadge}>
               <Text style={styles.savedBadgeText}>SAVED</Text>
+            </View>
+          )}
+
+          {/* Capacity Status Badge */}
+          {hasClasses && (
+            <View style={[styles.capacityBadge, { backgroundColor: `${capacityStatus.color}20` }]}>
+              <Text style={[styles.capacityBadgeText, { color: capacityStatus.color }]}>
+                {capacityStatus.text}
+              </Text>
             </View>
           )}
         </View>
@@ -333,6 +449,35 @@ export default function SearchScreen() {
               )
             ))}
           </View>
+
+          {/* Capacity Info */}
+          {hasClasses && (
+            <View style={styles.capacityInfoContainer}>
+              <View style={styles.capacityRow}>
+                <Text style={styles.capacityLabel}>Total Spots:</Text>
+                <Text style={styles.capacityValue}>{totalCapacity}</Text>
+              </View>
+              <View style={styles.capacityRow}>
+                <Text style={styles.capacityLabel}>Available:</Text>
+                <Text style={[styles.capacityValue, availableSpots > 0 ? styles.availableSpots : styles.noSpots]}>
+                  {availableSpots > 0 ? `${availableSpots} spots` : 'Full'}
+                </Text>
+              </View>
+              {availableSpots > 0 && (
+                <View style={styles.capacityProgress}>
+                  <View 
+                    style={[
+                      styles.capacityProgressFill,
+                      { 
+                        width: `${Math.min((totalEnrollment / totalCapacity) * 100, 100)}%`,
+                        backgroundColor: availableSpots > 0 ? '#22c55e' : '#ef4444'
+                      }
+                    ]} 
+                  />
+                </View>
+              )}
+            </View>
+          )}
           
           <View style={styles.resultFooter}>
             <View style={styles.priceContainer}>
@@ -341,20 +486,20 @@ export default function SearchScreen() {
                  result.weekly_price ? `R${result.weekly_price}/week` : 
                  result.price ? `R${result.price}/day` : 'Contact for pricing'}
               </Text>
-              <Text style={[styles.availability, { color: '#22c55e' }]}>
-                {result.accepting_applications ? 'Accepting Applications' : 'Waitlist Only'}
-              </Text>
             </View>
             <Pressable 
-              style={[styles.applyButton, !result.accepting_applications && styles.disabledButton]}
+              style={[
+                styles.applyButton, 
+                !availableClasses ? styles.waitlistButton : styles.applyNowButton,
+                !hasClasses && styles.contactButton
+              ]}
               onPress={(e) => {
                 e.stopPropagation();
                 handleApplyPress(result.id);
               }}
-              disabled={!result.accepting_applications}
             >
               <Text style={styles.applyButtonText}>
-                {result.accepting_applications ? 'Apply Now' : 'Join Waitlist'}
+                {!hasClasses ? 'Contact' : availableClasses ? 'Apply Now' : 'Join Waitlist'}
               </Text>
             </Pressable>
           </View>
@@ -456,14 +601,6 @@ export default function SearchScreen() {
             </Text>
           </Pressable>
           <Pressable 
-            style={[styles.filterChip, activeFilter === 'nearby' && styles.activeFilter]}
-            onPress={() => setActiveFilter('nearby')}
-          >
-            <Text style={[styles.filterText, activeFilter === 'nearby' && styles.activeFilterText]}>
-              Nearby
-            </Text>
-          </Pressable>
-          <Pressable 
             style={[styles.filterChip, activeFilter === 'available' && styles.activeFilter]}
             onPress={() => setActiveFilter('available')}
           >
@@ -505,6 +642,8 @@ export default function SearchScreen() {
               <Text style={styles.emptyStateSubtext}>
                 {activeFilter === 'saved' 
                   ? "You haven't saved any creches yet. Start exploring and save your favorites!"
+                  : activeFilter === 'available'
+                  ? "No creches with available spots found. Try clearing filters or checking back later."
                   : "Try adjusting your search criteria or check back later."
                 }
               </Text>
@@ -714,6 +853,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
+  capacityBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    zIndex: 2,
+  },
+  capacityBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
+  },
   resultContent: {
     padding: 16,
   },
@@ -788,6 +941,47 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontWeight: '500',
   },
+  capacityInfoContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  capacityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  capacityLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  capacityValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  availableSpots: {
+    color: '#22c55e',
+  },
+  noSpots: {
+    color: '#ef4444',
+  },
+  capacityProgress: {
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  capacityProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
   resultFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -802,18 +996,21 @@ const styles = StyleSheet.create({
     color: '#bd84f6',
     marginBottom: 2,
   },
-  availability: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   applyButton: {
-    backgroundColor: '#bd84f6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
   },
-  disabledButton: {
-    backgroundColor: '#9ca3af',
+  applyNowButton: {
+    backgroundColor: '#bd84f6',
+  },
+  waitlistButton: {
+    backgroundColor: '#f59e0b',
+  },
+  contactButton: {
+    backgroundColor: '#6b7280',
   },
   applyButtonText: {
     color: '#ffffff',
