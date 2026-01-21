@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Crechespots",
-    "slug": "crechespots",
+    "slug": "crechespots-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
@@ -37,10 +37,10 @@
           "crechespots"
         ]
       },
-      "bundleIdentifier": "com.softglitch.crechespots"
+      "bundleIdentifier": "com.softglitchsolutions.crechespots"
     },
     "android": {
-      "package": "com.softglitch.crechespots",
+      "package": "com.softglitchsolutions.crechespots",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon.png",
@@ -97,7 +97,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "11cbaddb-c987-4675-8075-144adc7ce071"
+        "projectId": "b70a5324-31cf-440d-bb9d-a89e1c47b694"
       }
     },
     "splash": {

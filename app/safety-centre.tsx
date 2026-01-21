@@ -214,21 +214,7 @@ export default function SafetyCenterScreen() {
         </View>
 
         {/* Report Concern */}
-        <View style={styles.reportSection}>
-          <View style={styles.reportIcon}>
-            <AlertTriangle size={24} color="#ffffff" />
-          </View>
-          <Text style={styles.reportTitle}>Report a Safety Concern</Text>
-          <Text style={styles.reportDescription}>
-            If you have any safety concerns about a creche or experience, please report it immediately.
-          </Text>
-          <Pressable 
-            style={styles.reportButton}
-            onPress={() => Alert.alert('Report', 'Report feature would open here')}
-          >
-            <Text style={styles.reportButtonText}>Report Concern</Text>
-          </Pressable>
-        </View>
+
       </ScrollView>
     </View>
   );
